@@ -45,6 +45,7 @@ class AggregatedCTIProvider(ICTIProvider):
             risk_score=risk_score,
             severity=severity,
             llm_analysis=llm_result.threat_summary,
+            recommended_actions=llm_result.recommended_actions,
             osint_evidence=osint_evidence,
         )
 
@@ -58,7 +59,10 @@ class AggregatedCTIProvider(ICTIProvider):
             risk_score=response.risk_score,
             severity=response.severity,
             llm_summary=response.llm_analysis,
-            osint_raw={"evidence": [item.model_dump(mode="json") for item in response.osint_evidence]},
+            osint_raw={
+                "evidence": [item.model_dump(mode="json") for item in response.osint_evidence],
+                "recommended_actions": response.recommended_actions,
+            },
         )
         self._db.add(entry)
         await self._db.commit()

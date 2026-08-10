@@ -27,5 +27,6 @@ class IOCAnalysisResponse(BaseModel):
     risk_score: int = Field(ge=0, le=100, description="0-100 arası hesaplanmış risk skoru")
     severity: Severity
     llm_analysis: str | None = None
+    recommended_actions: list[str] = Field(default_factory=list, description="LLM'in önerdiği SOC aksiyon planı")
     osint_evidence: list[OSINTEvidence] = Field(default_factory=list)
     analyzed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
