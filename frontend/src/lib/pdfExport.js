@@ -12,6 +12,9 @@ const HEADER_BG = [15, 23, 42]; // #0F172A - Obsidian Dark kart rengi
 
 const MARGIN_X = 14;
 const MAX_WIDTH = 180;
+const LINE_HEIGHT = 5;
+const RAW_LINE_HEIGHT = 3.6;
+const MAX_RAW_LINES = 25;
 
 const TR_TO_ASCII = {
   ç: "c",
@@ -29,12 +32,15 @@ const TR_TO_ASCII = {
 };
 
 /**
- * jsPDF'in standart fontları (Helvetica) Türkçe karakterleri (ı, ş, ğ vb.)
- * doğru render edemiyor — PDF'e yazmadan önce ASCII karşılıklarına çeviriyoruz.
+ * jsPDF'in standart fontları (Helvetica) Türkçe karakterleri doğru render edemiyor
+ * ve ASCII dışı herhangi bir Unicode karakterde (Kiril, Arapça, CJK vb.) bozuk
+ * kutu/glif üretiyor — önce Türkçe karşılıklarına çeviriyor, sonra kalan tüm
+ * ASCII-dışı karakterleri güvenli şekilde eliyoruz.
  */
 function pdfSafe(text) {
   if (typeof text !== "string") return text;
-  return text.replace(/[çÇğĞıİöÖşŞüÜ]/g, (char) => TR_TO_ASCII[char] ?? char);
+  const transliterated = text.replace(/[çÇğĞıİöÖşŞüÜ]/g, (char) => TR_TO_ASCII[char] ?? char);
+  return transliterated.replace(/[^\x00-\x7F]/g, "");
 }
 
 function drawHeader(doc, result) {
@@ -103,6 +109,105 @@ function drawFooter(doc) {
   }
 }
 
+/** VirusTotal/AbuseIPDB gibi bilinen kaynaklar için ham JSON yerine okunaklı madde
+ * listesi üretir. Tanınmayan kaynaklar için null döner (çağıran taraf ham veriye düşer). */
+function summarizeEvidence(item) {
+  const data = item.raw_data;
+
+  if (item.source === "virustotal" && data?.data?.attributes) {
+    const attrs = data.data.attributes;
+    const lines = [];
+    const stats = attrs.last_analysis_stats;
+    if (stats) {
+      const total = Object.values(stats).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      lines.push(`Motor tespiti: ${stats.malicious ?? 0}/${total} zararli, ${stats.suspicious ?? 0} supheli olarak isaretledi`);
+    }
+    if (Array.isArray(attrs.names) && attrs.names.length > 0) {
+      lines.push(`Bilinen dosya/gosterge adlari: ${attrs.names.slice(0, 3).join(", ")}`);
+    }
+    if (typeof attrs.reputation === "number") {
+      lines.push(`VirusTotal itibar puani: ${attrs.reputation}`);
+    }
+    if (attrs.last_modification_date) {
+      lines.push(`Son guncelleme: ${new Date(attrs.last_modification_date * 1000).toLocaleDateString("tr-TR")}`);
+    }
+    return lines.length > 0 ? lines : null;
+  }
+
+  if (item.source === "abuseipdb" && data?.data) {
+    const d = data.data;
+    const lines = [];
+    if (typeof d.abuseConfidenceScore === "number") {
+      lines.push(`Kotuye kullanim guven skoru: %${d.abuseConfidenceScore}`);
+    }
+    if (typeof d.totalReports === "number") {
+      lines.push(`Toplam sikayet sayisi: ${d.totalReports}`);
+    }
+    if (d.countryCode) lines.push(`Ulke: ${d.countryCode}`);
+    if (d.isp) lines.push(`Servis saglayici (ISS): ${d.isp}`);
+    if (d.domain) lines.push(`Iliskili domain: ${d.domain}`);
+    return lines.length > 0 ? lines : null;
+  }
+
+  return null;
+}
+
+function ensureSpace(doc, y, pageHeight, needed = 15) {
+  if (y > pageHeight - needed) {
+    doc.addPage();
+    return 20;
+  }
+  return y;
+}
+
+function drawEvidenceBlock(doc, item, y, pageHeight, accentColor) {
+  y = ensureSpace(doc, y, pageHeight, 20);
+
+  doc.setFont(undefined, "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...accentColor);
+  doc.text(pdfSafe(item.source).toUpperCase(), MARGIN_X, y);
+  doc.setFont(undefined, "normal");
+  doc.setTextColor(60, 60, 60);
+  y += 5;
+
+  const summary = summarizeEvidence(item);
+
+  if (summary) {
+    doc.setFontSize(9);
+    for (const line of summary) {
+      y = ensureSpace(doc, y, pageHeight);
+      const wrapped = doc.splitTextToSize(`- ${pdfSafe(line)}`, MAX_WIDTH);
+      for (const w of wrapped) {
+        y = ensureSpace(doc, y, pageHeight);
+        doc.text(w, MARGIN_X + 2, y);
+        y += LINE_HEIGHT;
+      }
+    }
+    return y + 3;
+  }
+
+  doc.setFontSize(8);
+  doc.setFont("courier", "normal");
+  let rawLines = doc.splitTextToSize(pdfSafe(JSON.stringify(item.raw_data, null, 2)), MAX_WIDTH);
+  const truncated = rawLines.length > MAX_RAW_LINES;
+  if (truncated) rawLines = rawLines.slice(0, MAX_RAW_LINES);
+
+  for (const line of rawLines) {
+    y = ensureSpace(doc, y, pageHeight);
+    doc.text(line, MARGIN_X, y);
+    y += RAW_LINE_HEIGHT;
+  }
+  if (truncated) {
+    y = ensureSpace(doc, y, pageHeight);
+    doc.setFont(undefined, "italic");
+    doc.text("(...devami uygulama arayuzunde goruntulenebilir)", MARGIN_X, y);
+    y += RAW_LINE_HEIGHT;
+  }
+  doc.setFont(undefined, "normal");
+  return y + 6;
+}
+
 /** Bir IOC analiz sonucunu tek tıkla kurumsal görünümlü bir PDF raporu olarak indirir. */
 export function exportAnalysisPdf(result) {
   const doc = new jsPDF();
@@ -137,22 +242,32 @@ export function exportAnalysisPdf(result) {
   doc.setFontSize(10);
   doc.setTextColor(40, 40, 40);
   const summaryLines = doc.splitTextToSize(pdfSafe(result.llm_analysis || "-"), MAX_WIDTH);
-  doc.text(summaryLines, MARGIN_X, y);
-  y += summaryLines.length * 5 + 8;
+  for (const line of summaryLines) {
+    y = ensureSpace(doc, y, pageHeight);
+    doc.text(line, MARGIN_X, y);
+    y += LINE_HEIGHT;
+  }
+  y += 6;
 
   if (result.recommended_actions?.length > 0) {
+    y = ensureSpace(doc, y, pageHeight, 25);
     drawSectionTitle(doc, "Onerilen Aksiyonlar", y, accentColor);
     y += 8;
     doc.setFontSize(10);
     doc.setTextColor(40, 40, 40);
     result.recommended_actions.forEach((action, index) => {
       const lines = doc.splitTextToSize(pdfSafe(`${index + 1}. ${action}`), MAX_WIDTH);
-      doc.text(lines, MARGIN_X, y);
-      y += lines.length * 5 + 2;
+      for (const line of lines) {
+        y = ensureSpace(doc, y, pageHeight);
+        doc.text(line, MARGIN_X, y);
+        y += LINE_HEIGHT;
+      }
+      y += 1;
     });
-    y += 6;
+    y += 4;
   }
 
+  y = ensureSpace(doc, y, pageHeight, 25);
   drawSectionTitle(doc, "OSINT Kanitlari", y, accentColor);
   y += 8;
 
@@ -164,21 +279,7 @@ export function exportAnalysisPdf(result) {
     doc.setFont(undefined, "normal");
   } else {
     for (const item of result.osint_evidence) {
-      if (y > pageHeight - 30) {
-        doc.addPage();
-        y = 20;
-      }
-      doc.setFont(undefined, "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(...accentColor);
-      doc.text(pdfSafe(item.source).toUpperCase(), MARGIN_X, y);
-      doc.setFont(undefined, "normal");
-      doc.setTextColor(60, 60, 60);
-      y += 5;
-      doc.setFontSize(8);
-      const raw = doc.splitTextToSize(pdfSafe(JSON.stringify(item.raw_data, null, 2)), MAX_WIDTH);
-      doc.text(raw, MARGIN_X, y);
-      y += raw.length * 3.6 + 6;
+      y = drawEvidenceBlock(doc, item, y, pageHeight, accentColor);
     }
   }
 

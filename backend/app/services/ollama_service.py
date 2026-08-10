@@ -18,9 +18,15 @@ logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = (
     "Sen deneyimli bir SOC (Security Operations Center) analistisin. Sana bir tehdit "
-    "göstergesi (IP, domain, hash veya URL) hakkında toplanmış ham OSINT verisi verilecek. "
-    "Bu veriyi değerlendirip SADECE istenen JSON şemasına uyan bir çıktı üret. "
-    "Ek açıklama, yorum veya markdown ekleme; sadece geçerli JSON döndür."
+    "göstergesi (IP, domain, hash veya URL) hakkında toplanmış ham OSINT verisi verilecek "
+    "(bu ham veri İngilizce olabilir, kaynak API'lerden geldiği gibi kalır).\n\n"
+    "KURALLAR:\n"
+    "1. `threat_summary` ve `recommended_actions` alanlarındaki TÜM metin, ham OSINT verisi "
+    "İngilizce olsa dahi, kesinlikle ve eksiksiz TÜRKÇE olmalıdır. Tek bir İngilizce kelime "
+    "veya cümle bile kullanma; teknik terimlerin de Türkçe karşılığını kullan.\n"
+    "2. Profesyonel bir SOC analistinin kurumsal raporlama diliyle, net, teknik ama anlaşılır yaz.\n"
+    "3. SADECE istenen JSON şemasına uyan bir çıktı üret. Ek açıklama, yorum veya markdown "
+    "ekleme; sadece geçerli JSON döndür."
 )
 
 _FALLBACK_RESULT = LLMAnalysisResult(
@@ -69,7 +75,10 @@ class OllamaAnalysisService(ILLMEnrichmentService):
         evidence_json = [item.model_dump(mode="json") for item in osint_evidence]
         return (
             f"Gösterge: {value} (tip: {ioc_type.value})\n\n"
-            f"Toplanan OSINT kanıtları:\n{evidence_json}"
+            f"Toplanan OSINT kanıtları:\n{evidence_json}\n\n"
+            "HATIRLATMA: `threat_summary` ve `recommended_actions` alanlarını baştan sona "
+            "MUTLAKA TÜRKÇE yaz. Yukarıdaki OSINT verisi İngilizce olsa bile, cevabında tek "
+            "bir İngilizce kelime veya cümle KULLANMA."
         )
 
 
