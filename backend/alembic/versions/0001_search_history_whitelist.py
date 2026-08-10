@@ -17,8 +17,8 @@ down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-ioc_type_enum = postgresql.ENUM("ip", "domain", "url", "hash", name="ioc_type_enum")
-severity_enum = postgresql.ENUM("critical", "high", "medium", "low", name="severity_enum")
+ioc_type_enum = postgresql.ENUM("ip", "domain", "url", "hash", name="ioc_type_enum", create_type=False)
+severity_enum = postgresql.ENUM("critical", "high", "medium", "low", name="severity_enum", create_type=False)
 
 
 def upgrade() -> None:
