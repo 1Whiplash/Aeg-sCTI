@@ -1,4 +1,4 @@
-import { FileDown, ShieldBan } from "lucide-react";
+import { Bot, CheckCircle2, FileDown, ShieldBan } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/Badge";
@@ -14,6 +14,13 @@ const SEVERITY_LABEL = {
   high: "Yüksek",
   medium: "Orta",
   low: "Düşük",
+};
+
+const SEVERITY_BORDER = {
+  critical: "border-l-critical",
+  high: "border-l-high",
+  medium: "border-l-medium",
+  low: "border-l-low",
 };
 
 export default function Investigate() {
@@ -64,7 +71,10 @@ export default function Investigate() {
     <div className="space-y-6">
       <div>
         <h1 className="break-all text-xl font-bold text-foreground">{value}</h1>
-        <p className="text-sm text-muted-foreground">Tip: {iocType.toUpperCase()}</p>
+        <p className="text-sm text-muted-foreground">
+          Tip: {iocType.toUpperCase()}
+          {result && ` · Analiz zamanı: ${new Date(result.analyzed_at).toLocaleString("tr-TR")}`}
+        </p>
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">Analiz ediliyor, bu biraz sürebilir...</p>}
@@ -109,12 +119,36 @@ export default function Investigate() {
               </Badge>
             </Card>
 
-            <Card className="lg:col-span-2">
+            <Card
+              className={cn(
+                "border-l-4 lg:col-span-2",
+                SEVERITY_BORDER[result.severity] ?? "border-l-border",
+              )}
+            >
               <CardHeader>
-                <CardTitle>AI SOC Analisti Raporu</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Bot className="h-4 w-4 text-primary" />
+                  <CardTitle>AI SOC Analisti Raporu</CardTitle>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <p className="text-sm leading-relaxed text-foreground">{result.llm_analysis}</p>
+
+                {result.recommended_actions?.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Önerilen Aksiyonlar
+                    </p>
+                    <ul className="space-y-2">
+                      {result.recommended_actions.map((action, index) => (
+                        <li key={index} className="flex items-start gap-2 text-sm text-foreground">
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                          <span>{action}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
