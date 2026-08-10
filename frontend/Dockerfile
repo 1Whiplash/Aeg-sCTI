@@ -4,7 +4,7 @@ FROM node:20-alpine AS development
 WORKDIR /app
 
 COPY package.json ./
-RUN npm install
+RUN npm install --no-audit --no-fund --loglevel=info
 
 COPY . .
 
@@ -17,7 +17,7 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 COPY package.json ./
-RUN npm install
+RUN npm install --no-audit --no-fund --loglevel=info
 COPY . .
 RUN npm run build
 
