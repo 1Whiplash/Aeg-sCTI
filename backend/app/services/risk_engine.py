@@ -2,6 +2,14 @@
 
 Skor = (AbuseIPDB × 0.35) + (VirusTotal × 0.35) + (LLM Skor × 0.30)
 
+Bir kaynaktan hiç veri gelmemişse (API key tanımlı değil, kaynak bu IOC tipini
+desteklemiyor vb.) o kaynak formülden tamamen çıkarılır ve kalan kaynakların
+ağırlıkları toplamı 1'e tamamlayacak şekilde ORANTISAL olarak yeniden dağıtılır.
+Aksi halde (eski davranış) eksik kaynaklar sessizce "0 risk" sayılıp ağırlıklarını
+formülde tutardı — bu da örn. sadece LLM'in mevcut olduğu durumlarda skorun asla
+%30'u (LLM ağırlığı) geçememesine, yani gerçekten zararlı bir gösterge için bile
+LLM ne kadar emin olursa olsun "düşük risk" çıkmasına yol açıyordu.
+
 Girdi Whitelist tablosundaysa (bilinen güvenli IP/domain) skor doğrudan 0'dır.
 """
 
@@ -39,12 +47,17 @@ class RiskEngine:
         abuseipdb_score = self._extract_abuseipdb_score(osint_evidence)
         virustotal_score = self._extract_virustotal_score(osint_evidence)
 
-        weighted = (
-            abuseipdb_score * _ABUSEIPDB_WEIGHT
-            + virustotal_score * _VIRUSTOTAL_WEIGHT
-            + llm_score * _LLM_WEIGHT
-        )
-        final_score = round(min(max(weighted, 0.0), 100.0))
+        # LLM her zaman mevcuttur (analiz her durumda çalışır); diğer iki kaynak
+        # sadece gerçekten veri döndüyse dahil edilir.
+        components: list[tuple[float, float]] = [(llm_score, _LLM_WEIGHT)]
+        if abuseipdb_score is not None:
+            components.append((abuseipdb_score, _ABUSEIPDB_WEIGHT))
+        if virustotal_score is not None:
+            components.append((virustotal_score, _VIRUSTOTAL_WEIGHT))
+
+        total_weight = sum(weight for _, weight in components)
+        weighted_sum = sum(score * weight for score, weight in components)
+        final_score = round(min(max(weighted_sum / total_weight, 0.0), 100.0))
         return final_score, self._severity_for(final_score)
 
     @staticmethod
@@ -53,18 +66,21 @@ class RiskEngine:
         return result.scalar_one_or_none() is not None
 
     @staticmethod
-    def _extract_abuseipdb_score(evidence: list[OSINTEvidence]) -> float:
+    def _extract_abuseipdb_score(evidence: list[OSINTEvidence]) -> float | None:
+        """AbuseIPDB kanıtı yoksa `None` döner (formülden tamamen çıkarılır)."""
         for item in evidence:
             if item.source != "abuseipdb":
                 continue
             try:
                 return float(item.raw_data["data"]["abuseConfidenceScore"])
             except (KeyError, TypeError, ValueError):
-                logger.warning("AbuseIPDB verisi beklenen formatta değil, 0 kabul edildi.")
-        return 0.0
+                logger.warning("AbuseIPDB verisi beklenen formatta değil, kaynak göz ardı edildi.")
+                return None
+        return None
 
     @staticmethod
-    def _extract_virustotal_score(evidence: list[OSINTEvidence]) -> float:
+    def _extract_virustotal_score(evidence: list[OSINTEvidence]) -> float | None:
+        """VirusTotal kanıtı yoksa `None` döner (formülden tamamen çıkarılır)."""
         for item in evidence:
             if item.source != "virustotal":
                 continue
@@ -72,12 +88,13 @@ class RiskEngine:
                 stats = item.raw_data["data"]["attributes"]["last_analysis_stats"]
                 total = sum(stats.values())
                 if total == 0:
-                    return 0.0
+                    return None
                 malicious_weight = stats.get("malicious", 0) + stats.get("suspicious", 0) * 0.5
                 return (malicious_weight / total) * 100
             except (KeyError, TypeError, ValueError):
-                logger.warning("VirusTotal verisi beklenen formatta değil, 0 kabul edildi.")
-        return 0.0
+                logger.warning("VirusTotal verisi beklenen formatta değil, kaynak göz ardı edildi.")
+                return None
+        return None
 
     @staticmethod
     def _severity_for(score: int) -> Severity:
