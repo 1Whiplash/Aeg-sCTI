@@ -15,3 +15,9 @@ class Severity(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
+
+
+def enum_values(enum_cls: type[Enum]) -> list[str]:
+    """SQLAlchemy `Enum(..., values_callable=enum_values)` için — Postgres tarafında
+    üye adı (`IP`) yerine değeri (`ip`) kullanılmasını sağlar."""
+    return [member.value for member in enum_cls]
