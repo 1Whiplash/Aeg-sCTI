@@ -1,50 +1,69 @@
-"""Somut CTI sağlayıcı implementasyonu (Faz 1: iskelet/stub).
+"""Somut CTI sağlayıcı implementasyonu.
 
-Gerçek entegrasyonlar (VirusTotal, AbuseIPDB, Shodan, OTX, MISP) bu sınıf
-içinde httpx.AsyncClient ile eklenecektir. Şimdilik Read-Only moda uygun
-şekilde deterministik bir "unknown" yanıtı döner.
+OSINT toplama (aggregator) → LLM analizi (ollama_service) → risk skorlama
+(risk_engine) zincirini çalıştırır ve sonucu `search_history` tablosuna
+kalıcı olarak kaydeder.
 """
 
 import logging
 
-from app.core.config import settings
-from app.core.enums import Severity
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import get_db_session
+from app.models.search_history import SearchHistory
 from app.schemas.ioc import IOCAnalysisRequest, IOCAnalysisResponse
+from app.services.aggregator import OSINTAggregator
 from app.services.interfaces import ICTIProvider
+from app.services.ollama_service import OllamaAnalysisService
+from app.services.risk_engine import RiskEngine
 
 logger = logging.getLogger(__name__)
 
 
 class AggregatedCTIProvider(ICTIProvider):
-    """Birden fazla CTI kaynağını birleştiren agregatör servis."""
+    """OSINT + LLM + risk motorunu birleştiren, sonucu kalıcı kaydeden CTI sağlayıcı."""
 
-    def __init__(self) -> None:
-        self._sources: list[str] = []
-        if settings.VIRUSTOTAL_API_KEY:
-            self._sources.append("virustotal")
-        if settings.ABUSEIPDB_API_KEY:
-            self._sources.append("abuseipdb")
-        if settings.SHODAN_API_KEY:
-            self._sources.append("shodan")
-        if settings.OTX_API_KEY:
-            self._sources.append("otx")
+    def __init__(self, db: AsyncSession) -> None:
+        self._db = db
+        self._aggregator = OSINTAggregator()
+        self._llm_service = OllamaAnalysisService()
+        self._risk_engine = RiskEngine()
 
     async def lookup(self, request: IOCAnalysisRequest) -> IOCAnalysisResponse:
         logger.info("IOC sorgulanıyor: %s (%s)", request.value, request.ioc_type)
 
-        if not self._sources:
-            logger.warning("Hiçbir CTI API key'i tanımlı değil; stub yanıt dönülüyor.")
-
-        return IOCAnalysisResponse(
-            value=request.value,
-            ioc_type=request.ioc_type,
-            risk_score=0,
-            severity=Severity.LOW,
-            llm_analysis="Faz 1 iskelet yanıtı: gerçek kaynak entegrasyonu henüz eklenmedi.",
-            osint_evidence=[],
+        osint_evidence = await self._aggregator.gather(request.value, request.ioc_type)
+        llm_result = await self._llm_service.analyze(request.value, request.ioc_type, osint_evidence)
+        risk_score, severity = await self._risk_engine.score(
+            self._db, request.value, osint_evidence, llm_result.risk_score
         )
 
+        response = IOCAnalysisResponse(
+            value=request.value,
+            ioc_type=request.ioc_type,
+            risk_score=risk_score,
+            severity=severity,
+            llm_analysis=llm_result.threat_summary,
+            osint_evidence=osint_evidence,
+        )
 
-def get_cti_provider() -> ICTIProvider:
+        await self._persist(response)
+        return response
+
+    async def _persist(self, response: IOCAnalysisResponse) -> None:
+        entry = SearchHistory(
+            ioc_value=response.value,
+            ioc_type=response.ioc_type,
+            risk_score=response.risk_score,
+            severity=response.severity,
+            llm_summary=response.llm_analysis,
+            osint_raw={"evidence": [item.model_dump(mode="json") for item in response.osint_evidence]},
+        )
+        self._db.add(entry)
+        await self._db.commit()
+
+
+def get_cti_provider(db: AsyncSession = Depends(get_db_session)) -> ICTIProvider:
     """FastAPI dependency injection için factory fonksiyonu."""
-    return AggregatedCTIProvider()
+    return AggregatedCTIProvider(db)

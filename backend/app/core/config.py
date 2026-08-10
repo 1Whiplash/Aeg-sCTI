@@ -85,6 +85,13 @@ class Settings(BaseSettings):
     MISP_URL: str | None = None
     MISP_API_KEY: str | None = None
 
+    # --- FortiGate SOAR (Faz 1: Pasif/Standby) ---
+    FORTIGATE_HOST: str | None = None
+    FORTIGATE_API_KEY: str | None = None
+    FORTIGATE_VERIFY_SSL: bool = True
+    # Bu bayrak açık olmadan fortigate_service hiçbir isteği dışarı göndermez.
+    FORTIGATE_AUTO_BLOCK_ENABLED: bool = False
+
     # --- Loglama ---
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
