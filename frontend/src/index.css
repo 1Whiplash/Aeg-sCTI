@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root.dark {
+    /* Koyu SOC teması - shadcn/ui HSL kanal formatı */
+    --background: 222 47% 6%;
+    --foreground: 210 20% 92%;
+    --card: 222 40% 9%;
+    --card-foreground: 210 20% 92%;
+    --border: 217 30% 18%;
+    --primary: 189 94% 43%;
+    --primary-foreground: 222 47% 6%;
+    --muted: 217 30% 14%;
+    --muted-foreground: 215 16% 60%;
+    --radius: 0.5rem;
+
+    /* Tehdit seviyesi renkleri */
+    --critical: 0 84% 60%;
+    --high: 24 94% 53%;
+    --medium: 45 93% 50%;
+    --low: 142 71% 45%;
+    --info: 199 89% 48%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
