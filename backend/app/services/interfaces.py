@@ -9,7 +9,9 @@ arayüzlere bağımlı olur. Böylece yeni bir tehdit istihbaratı kaynağı
 
 from abc import ABC, abstractmethod
 
-from app.schemas.ioc import IOCAnalysisRequest, IOCAnalysisResponse
+from app.core.enums import IOCType
+from app.schemas.ioc import IOCAnalysisRequest, IOCAnalysisResponse, OSINTEvidence
+from app.schemas.llm import LLMAnalysisResult
 
 
 class ICTIProvider(ABC):
@@ -22,9 +24,11 @@ class ICTIProvider(ABC):
 
 
 class ILLMEnrichmentService(ABC):
-    """LLM (Qwen 2.5 / Ollama) tabanlı analiz/raporlama zenginleştirme arayüzü."""
+    """LLM (Qwen 2.5 / Ollama) tabanlı yapılandırılmış analiz arayüzü."""
 
     @abstractmethod
-    async def summarize(self, context: str) -> str:
-        """Ham teknik veriyi analist-dostu bir özete dönüştürür."""
+    async def analyze(
+        self, value: str, ioc_type: IOCType, osint_evidence: list[OSINTEvidence]
+    ) -> LLMAnalysisResult:
+        """Ham OSINT kanıtlarını, şemaya uygun (structured) bir SOC analizine dönüştürür."""
         raise NotImplementedError
