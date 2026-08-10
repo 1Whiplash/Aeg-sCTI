@@ -8,7 +8,8 @@ içinde httpx.AsyncClient ile eklenecektir. Şimdilik Read-Only moda uygun
 import logging
 
 from app.core.config import settings
-from app.schemas.ioc import IOCAnalysisRequest, IOCAnalysisResponse, IOCVerdict
+from app.core.enums import Severity
+from app.schemas.ioc import IOCAnalysisRequest, IOCAnalysisResponse
 from app.services.interfaces import ICTIProvider
 
 logger = logging.getLogger(__name__)
@@ -37,10 +38,10 @@ class AggregatedCTIProvider(ICTIProvider):
         return IOCAnalysisResponse(
             value=request.value,
             ioc_type=request.ioc_type,
-            verdict=IOCVerdict.UNKNOWN,
-            confidence=0.0,
-            sources=self._sources,
-            summary="Faz 1 iskelet yanıtı: gerçek kaynak entegrasyonu henüz eklenmedi.",
+            risk_score=0,
+            severity=Severity.LOW,
+            llm_analysis="Faz 1 iskelet yanıtı: gerçek kaynak entegrasyonu henüz eklenmedi.",
+            osint_evidence=[],
         )
 
 

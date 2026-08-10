@@ -1,16 +1,12 @@
 """IOC (Indicator of Compromise) analiz istek/yanıt şemaları."""
 
-from datetime import datetime
-from enum import Enum
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
+from app.core.enums import IOCType, Severity
 
-class IOCType(str, Enum):
-    IP = "ip"
-    DOMAIN = "domain"
-    URL = "url"
-    HASH = "hash"
+__all__ = ["IOCType", "Severity", "IOCAnalysisRequest", "OSINTEvidence", "IOCAnalysisResponse"]
 
 
 class IOCAnalysisRequest(BaseModel):
@@ -18,18 +14,18 @@ class IOCAnalysisRequest(BaseModel):
     ioc_type: IOCType
 
 
-class IOCVerdict(str, Enum):
-    MALICIOUS = "malicious"
-    SUSPICIOUS = "suspicious"
-    CLEAN = "clean"
-    UNKNOWN = "unknown"
+class OSINTEvidence(BaseModel):
+    """Tek bir OSINT kaynağından (VirusTotal, AbuseIPDB, Shodan vb.) dönen ham kanıt."""
+
+    source: str
+    raw_data: dict = Field(default_factory=dict)
 
 
 class IOCAnalysisResponse(BaseModel):
     value: str
     ioc_type: IOCType
-    verdict: IOCVerdict
-    confidence: float = Field(ge=0.0, le=1.0)
-    sources: list[str] = Field(default_factory=list)
-    summary: str | None = None
-    analyzed_at: datetime = Field(default_factory=datetime.utcnow)
+    risk_score: int = Field(ge=0, le=100, description="0-100 arası hesaplanmış risk skoru")
+    severity: Severity
+    llm_analysis: str | None = None
+    osint_evidence: list[OSINTEvidence] = Field(default_factory=list)
+    analyzed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
