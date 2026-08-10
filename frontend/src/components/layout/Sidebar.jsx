@@ -14,7 +14,7 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-60 flex-col border-r border-border bg-card">
       <div className="flex items-center gap-2 border-b border-border px-4 py-4">
-        <ShieldAlert className="h-6 w-6 text-primary" />
+        <ShieldAlert className="glow-shield h-6 w-6 text-primary" />
         <div>
           <p className="text-sm font-bold leading-none text-foreground">AegisCTI</p>
           <p className="text-[11px] text-muted-foreground">Read-Only SOC</p>

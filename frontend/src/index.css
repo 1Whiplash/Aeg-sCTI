@@ -4,10 +4,11 @@
 
 @layer base {
   :root.dark {
-    /* Koyu SOC teması - shadcn/ui HSL kanal formatı */
-    --background: 222 47% 6%;
+    /* Obsidian Dark SOC teması - shadcn/ui HSL kanal formatı
+       --background = #090D16, --card = #0F172A */
+    --background: 222 42% 6%;
     --foreground: 210 20% 92%;
-    --card: 222 40% 9%;
+    --card: 222 47% 11%;
     --card-foreground: 210 20% 92%;
     --border: 217 30% 18%;
     --primary: 189 94% 43%;
@@ -26,5 +27,17 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .glow-shield {
+    filter: drop-shadow(0 0 6px hsl(var(--primary) / 0.65));
+  }
+  .glow-critical {
+    box-shadow: 0 0 14px -2px hsl(var(--critical) / 0.55);
+  }
+  .glow-high {
+    box-shadow: 0 0 14px -2px hsl(var(--high) / 0.45);
   }
 }

@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
 
 const VARIANTS = {
-  critical: "bg-critical/15 text-critical border-critical/30",
-  high: "bg-high/15 text-high border-high/30",
+  critical: "glow-critical bg-critical/15 text-critical border-critical/30",
+  high: "glow-high bg-high/15 text-high border-high/30",
   medium: "bg-medium/15 text-medium border-medium/30",
   low: "bg-low/15 text-low border-low/30",
   info: "bg-info/15 text-info border-info/30",
