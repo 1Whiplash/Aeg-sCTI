@@ -96,14 +96,13 @@ services:
         sleep 5
         ollama pull qwen2.5:7b || true
         wait
-    # GPU kullanılabilirse aşağıdaki bloğun yorum satırından çıkarılması önerilir:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     networks:
       - aegisci-network
 
