@@ -1,6 +1,8 @@
 import { Route, HashRouter as Router, Routes } from "react-router-dom";
+import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import Dashboard from "@/pages/Dashboard";
+import Investigate from "@/pages/Investigate";
 
 function Placeholder({ title }) {
   return (
@@ -16,15 +18,18 @@ export default function App() {
     <Router>
       <div className="flex min-h-screen bg-background">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto p-6">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/investigate" element={<Placeholder title="IOC İncele" />} />
-            <Route path="/alerts" element={<Placeholder title="Uyarılar" />} />
-            <Route path="/activity" element={<Placeholder title="Aktivite" />} />
-            <Route path="/settings" element={<Placeholder title="Ayarlar" />} />
-          </Routes>
-        </main>
+        <div className="flex flex-1 flex-col">
+          <Header />
+          <main className="flex-1 overflow-y-auto p-6">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/investigate" element={<Investigate />} />
+              <Route path="/alerts" element={<Placeholder title="Uyarılar" />} />
+              <Route path="/activity" element={<Placeholder title="Aktivite" />} />
+              <Route path="/settings" element={<Placeholder title="Ayarlar" />} />
+            </Routes>
+          </main>
+        </div>
       </div>
     </Router>
   );
