@@ -1,3 +1,4 @@
+import { FileDown, ShieldBan } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/Badge";
@@ -5,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { RiskGauge } from "@/components/ui/RiskGauge";
 import { Tabs } from "@/components/ui/Tabs";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { exportAnalysisPdf } from "@/lib/pdfExport";
 
 const SEVERITY_LABEL = {
   critical: "Kritik",
@@ -21,18 +24,30 @@ export default function Investigate() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [blockState, setBlockState] = useState(null); // null | "loading" | { blocked, message }
 
   useEffect(() => {
     if (!value || !iocType) return;
     setLoading(true);
     setError(null);
     setResult(null);
+    setBlockState(null);
     api
       .analyzeIOC({ value, ioc_type: iocType })
       .then(setResult)
       .catch(() => setError("Analiz sırasında bir hata oluştu."))
       .finally(() => setLoading(false));
   }, [value, iocType]);
+
+  async function handleBlockIp() {
+    setBlockState("loading");
+    try {
+      const response = await api.blockIp(value);
+      setBlockState(response);
+    } catch {
+      setBlockState({ blocked: false, message: "İstek gönderilemedi." });
+    }
+  }
 
   if (!value || !iocType) {
     return (
@@ -57,6 +72,35 @@ export default function Investigate() {
 
       {result && (
         <>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => exportAnalysisPdf(result)}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+            >
+              <FileDown className="h-4 w-4" />
+              PDF İndir
+            </button>
+
+            {iocType === "ip" && (
+              <button
+                type="button"
+                onClick={handleBlockIp}
+                disabled={blockState === "loading"}
+                className="inline-flex items-center gap-2 rounded-md border border-critical/40 bg-critical/10 px-3 py-2 text-sm font-medium text-critical hover:bg-critical/20 disabled:opacity-50"
+              >
+                <ShieldBan className="h-4 w-4" />
+                {blockState === "loading" ? "Gönderiliyor..." : "FortiGate'e Kural Bas"}
+              </button>
+            )}
+          </div>
+
+          {blockState && blockState !== "loading" && (
+            <p className={cn("text-sm", blockState.blocked ? "text-low" : "text-muted-foreground")}>
+              {blockState.message}
+            </p>
+          )}
+
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Card className="flex flex-col items-center justify-center gap-3 p-6 lg:col-span-1">
               <RiskGauge score={result.risk_score} />

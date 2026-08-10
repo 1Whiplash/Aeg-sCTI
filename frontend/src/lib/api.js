@@ -18,4 +18,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  blockIp: (ipAddress) =>
+    request("/actions/block-ip", {
+      method: "POST",
+      body: JSON.stringify({ ip_address: ipAddress }),
+    }),
 };

@@ -2,9 +2,10 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import health, history, ioc
+from app.api.v1 import actions, health, history, ioc
 
 api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(ioc.router)
 api_router.include_router(history.router)
+api_router.include_router(actions.router)
