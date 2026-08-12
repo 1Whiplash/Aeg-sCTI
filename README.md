@@ -1,47 +1,136 @@
-# AegisCTI — Faz 1 (Read-Only CTI & SOAR İskeleti)
+# AegisCTI — Otonom Siber Tehdit İstihbaratı ve SOAR Platformu
 
-Otonom Siber Tehdit İstihbaratı ve SOAR platformunun ilk aşaması: analiz ve
-raporlama yapan, henüz otomatik aksiyon almayan (Read-Only) modüler bir sistem.
+Faz 1: sistem salt-okunur (Read-Only) modda çalışır — IP/domain/URL/hash
+göstergelerini birden çok OSINT kaynağından toplayıp yerel bir LLM (Qwen 2.5)
+ile analiz eden, risk skorlayan ve raporlayan bir SOC konsolu. Otomatik
+müdahale (SOAR aksiyonları) bilinçli olarak devre dışı/pasif bırakılmıştır.
+
+## Özellikler
+
+- **Çok kaynaklı OSINT toplama**: VirusTotal, AbuseIPDB, Shodan, AlienVault
+  OTX — paralel çalışır, hiçbiri veri dönmezse domain/URL için canlı web
+  taraması (sayfa başlığı, WHOIS, SSL sertifika yaşı) fallback olarak devreye
+  girer.
+- **Yerel LLM analizi**: Ollama üzerinde çalışan Qwen 2.5, toplanan kanıtları
+  yapılandırılmış (JSON şema zorlamalı) bir SOC raporuna çevirir — risk
+  skoru, tehdit özeti, önerilen aksiyonlar. Yanıtın Türkçe kalması ve
+  sadece somut kanıta dayanması için pekiştirilmiş prompt + otomatik
+  yeniden deneme + yedek mesaj güvencesi var.
+- **Ağırlıklı risk skorlama**: `AbuseIPDB × 0.35 + VirusTotal × 0.35 + LLM × 0.30`
+  — eksik kaynaklar orantısal olarak yeniden dağıtılır, whitelist'teki
+  göstergeler her zaman 0 puan alır.
+- **Redis önbellekleme**: aynı gösterge kısa süre içinde tekrar sorgulanırsa
+  API/LLM zinciri yeniden çalıştırılmaz (20 dakika TTL).
+- **Coğrafi tehdit haritası**: IP göstergeleri için gerçek ülke sınırlarına
+  sahip bir dünya haritasında konum gösterimi (Shodan hassas konum, yoksa
+  ülke koduna göre yaklaşık merkez).
+- **Whitelist yönetimi, sorgu geçmişi, otomatik uyarı listesi** (risk ≥ 50),
+  Dashboard'da canlı istatistikler ve çoklu-nokta harita.
+- **PDF rapor dışa aktarma**: kurumsal görünümlü, özetlenmiş OSINT
+  bulgularıyla tek tıkla indirilebilir rapor.
+- **Pasif FortiGate SOAR istemcisi**: `FORTIGATE_AUTO_BLOCK_ENABLED=false`
+  olduğu sürece hiçbir gerçek isteği dışarı göndermez.
+- **Güvenlik**: JWT tabanlı admin girişi (whitelist yazma + FortiGate
+  aksiyonu korumalı), Redis tabanlı rate limiting (analyze/login/block-ip),
+  SSRF koruması (web scraper özel/iç ağ adreslerine istek atmaz), girdi
+  doğrulama.
 
 ## Klasör Yapısı
 
 ```
 AegisCTI/
-├── backend/                # FastAPI (async, SOLID katmanlı mimari)
+├── backend/                     # FastAPI (async, SOLID katmanlı mimari)
 │   └── app/
-│       ├── api/v1/         # Route'lar (health, ioc)
-│       ├── core/           # config.py, logging_config.py
-│       ├── db/             # SQLAlchemy engine/session
-│       ├── models/         # ORM modelleri
-│       ├── schemas/        # Pydantic şemaları
-│       └── services/       # İş mantığı + arayüzler (DIP)
-├── frontend/                # React + Vite + TailwindCSS (dark SOC teması)
+│       ├── api/v1/              # auth, health, ioc, history, actions, whitelist
+│       ├── core/                # config.py, enums.py, logging_config.py
+│       ├── db/                  # SQLAlchemy engine/session
+│       ├── models/               # search_history, whitelist (ORM)
+│       ├── schemas/              # Pydantic şemaları
+│       └── services/             # İş mantığı + OSINT collector'lar + arayüzler
+│           ├── virustotal.py / abuseipdb.py / shodan.py / otx.py / web_scraper.py
+│           ├── aggregator.py     # collector'ları paralel çalıştırır
+│           ├── risk_engine.py    # ağırlıklı skor formülü
+│           ├── ollama_service.py # LLM analizi (dil/kalibrasyon güvencesi)
+│           ├── geo.py            # coğrafi konum çıkarımı
+│           ├── cache.py          # Redis önbellek
+│           ├── rate_limiter.py   # Redis tabanlı rate limiting
+│           ├── auth.py           # JWT admin girişi
+│           └── fortigate_service.py  # pasif SOAR istemcisi
+│   └── alembic/                 # DB migration'ları
+├── frontend/                     # React + Vite + TailwindCSS (Obsidian Dark tema)
 │   └── src/
-│       ├── components/     # UI (shadcn/ui tarzı) + layout
-│       ├── lib/             # api client, utils
-│       └── pages/           # Dashboard vb.
-└── docker-compose.yml       # backend, frontend, postgres, redis, ollama
+│       ├── components/ui/        # RiskGauge, ThreatMap, Tabs, AdminLoginGate...
+│       ├── components/layout/    # Header (global arama), Sidebar
+│       ├── lib/                  # api.js, auth.js, detectIocType.js, pdfExport.js
+│       └── pages/                # Dashboard, Investigate, Alerts, Activity, Settings
+└── docker-compose.yml             # backend, frontend, postgres, redis, ollama
 ```
+
+## Teknoloji Yığını
+
+**Backend:** FastAPI, SQLAlchemy (async) + Alembic, PostgreSQL, Redis, httpx,
+BeautifulSoup4, PyJWT
+
+**Frontend:** React 18, Vite, TailwindCSS, react-router-dom, d3-geo +
+topojson-client + world-atlas (harita), jsPDF
+
+**LLM:** Ollama + Qwen 2.5 7B (yerel, GPU destekli)
 
 ## Hızlı Başlangıç
 
 ```bash
 cd AegisCTI/backend
-cp .env.example .env   # API key'lerini doldurun
-
-cd ..
-docker compose up --build
+cp .env.example .env
 ```
 
-- Backend: http://localhost:8000/docs
+`.env` içinde doldurman gerekenler:
+
+| Değişken | Açıklama |
+|---|---|
+| `SECRET_KEY` | JWT imzalama anahtarı — rastgele üret (`python -c "import secrets; print(secrets.token_hex(32))"`) |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Whitelist yazma ve FortiGate aksiyonu için admin girişi |
+| `VIRUSTOTAL_API_KEY` | virustotal.com/gui/join-us (ücretsiz, dk'da 4 istek) |
+| `SHODAN_API_KEY` | account.shodan.io (ücretsiz katman kısıtlı — bazı IP'lerde 403 verebilir) |
+| `ABUSEIPDB_API_KEY` | abuseipdb.com/register (ücretsiz, günde 1000 istek) |
+| `OTX_API_KEY` | otx.alienvault.com (ücretsiz) |
+
+```bash
+cd ..
+docker compose up -d --build
+docker exec aegisci-backend alembic upgrade head
+```
+
 - Frontend: http://localhost:5173
-- Ollama (Qwen 2.5): http://localhost:11434
+- Backend API dokümantasyonu: http://localhost:8000/docs
+- Ollama: http://localhost:11434
 
-## Notlar
+**Not (Windows):** `npm install` Docker build sırasında bazen BuildKit
+kaynaklı ağ sorunları yüzünden takılabiliyor. Takılırsa:
+```bash
+$env:DOCKER_BUILDKIT="0"; $env:COMPOSE_BAKE="false"; docker compose up -d --build
+```
 
-- `READ_ONLY_MODE=true` iken sistem yalnızca analiz/raporlama yapar; SOAR
-  otomatik müdahale modülleri Faz 2'de bu bayrak açılarak devreye alınacaktır.
-- CTI kaynak API key'leri (VirusTotal, AbuseIPDB, Shodan, OTX, MISP)
-  `backend/app/core/config.py` üzerinden `Settings` sınıfına enjekte edilir.
-- `ICTIProvider` ve `ILLMEnrichmentService` arayüzleri sayesinde yeni kaynaklar
-  mevcut kodu bozmadan eklenebilir (SOLID: Open/Closed & Dependency Inversion).
+## API Uç Noktaları (özet)
+
+| Uç nokta | Açıklama | Korumalı mı |
+|---|---|---|
+| `POST /api/v1/ioc/analyze` | IOC analiz (ana akış) | Rate limit (10/dk) |
+| `GET /api/v1/history` | Geçmiş sorgular (`min_risk_score` filtresi destekler) | Açık |
+| `GET/POST /api/v1/whitelist` | Whitelist listele/ekle | POST admin girişi ister |
+| `DELETE /api/v1/whitelist/{id}` | Whitelist'ten sil | Admin girişi ister |
+| `POST /api/v1/actions/block-ip` | FortiGate engelleme (pasif) | Admin + rate limit (5/dk) |
+| `POST /api/v1/auth/login` | Admin girişi, JWT döner | Rate limit (5/dk, brute-force koruması) |
+
+## Bilinen Sınırlamalar / Faz 2 Adayları
+
+- Tek admin hesabı var, çok kullanıcılı yetkilendirme yok.
+- Rate limiting istemci IP'sine göre çalışıyor; Vite proxy arkasında tüm
+  istekler aynı IP'den geliyormuş gibi görünebilir (tek-kullanıcılı Faz 1
+  için sorun değil, gerçek dağıtımda X-Forwarded-For desteği eklenmeli).
+- Shodan'ın ücretsiz planı bazı "işaretli" IP'lerde (Tor node'ları vb.)
+  403 dönebiliyor — hesap kısıtlaması, kod tarafında çözülemez.
+- LLM küçük bir model (7B) olduğu için nadiren hâlâ hatalı çıkarım
+  yapabiliyor; kod tarafında kalibrasyon kuralları ve dil-kirlenmesi
+  koruması var ama %100 garanti değil.
+- `FORTIGATE_AUTO_BLOCK_ENABLED` ve `READ_ONLY_MODE` Faz 2'de gerçek
+  otomatik müdahale için etkinleştirilecek — şu an ikisi de pasif.
