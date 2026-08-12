@@ -10,12 +10,21 @@ from fastapi import APIRouter, Depends
 from app.schemas.actions import BlockIPRequest, BlockIPResponse
 from app.services.auth import require_auth
 from app.services.fortigate_service import FortiGateService
+from app.services.rate_limiter import RateLimiter
 
 router = APIRouter(prefix="/actions", tags=["Actions"])
 
+# Gerçek bir aksiyon uç noktası (ileride firewall kuralı tetikleyebilir),
+# analyze'den daha sıkı bir limit uyguluyoruz.
+_block_ip_rate_limit = RateLimiter(max_requests=5, window_seconds=60, key_prefix="block-ip")
+
 
 @router.post("/block-ip", response_model=BlockIPResponse)
-async def block_ip(request: BlockIPRequest, _admin: str = Depends(require_auth)) -> BlockIPResponse:
+async def block_ip(
+    request: BlockIPRequest,
+    _admin: str = Depends(require_auth),
+    _rate_limit: None = Depends(_block_ip_rate_limit),
+) -> BlockIPResponse:
     """Analistin manuel onayıyla bir IP'yi FortiGate'te engellemeyi dener."""
     service = FortiGateService()
     blocked = await service.block_ip(request.ip_address)

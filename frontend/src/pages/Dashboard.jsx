@@ -49,7 +49,10 @@ export default function Dashboard() {
             label: [item.ioc_value, item.geo.city, item.geo.country].filter(Boolean).join(" · "),
           })),
         );
-        setRecentAlerts(withGeo.filter((item) => item.risk_score >= ALERT_THRESHOLD).slice(0, 8));
+        // Konum verisi olmayan uyarılar (örn. hash tipi göstergeler) da listeye dahil
+        // edilmeli — sadece haritada gösterilemezler, "Son Uyarılar" panelinden
+        // gizlenmemeliler (bu daha önce gerçek uyarıları sessizce saklıyordu).
+        setRecentAlerts(items.filter((item) => item.risk_score >= ALERT_THRESHOLD).slice(0, 8));
       })
       .catch(() => {});
   }, []);
@@ -133,7 +136,8 @@ export default function Dashboard() {
                   <div className="min-w-0">
                     <p className="truncate font-medium text-foreground">{item.ioc_value}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {[item.geo?.city, item.geo?.country].filter(Boolean).join(", ") || "—"}
+                      {[item.geo?.city, item.geo?.country].filter(Boolean).join(", ") ||
+                        `Konum yok (${item.ioc_type.toUpperCase()})`}
                     </p>
                   </div>
                   <Badge variant={item.severity}>
