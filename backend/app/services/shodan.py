@@ -34,7 +34,9 @@ class ShodanCollector(BaseCollector):
                 response.raise_for_status()
                 return OSINTEvidence(source=self.source_name, raw_data=response.json())
             except httpx.HTTPError as exc:
-                logger.warning("Shodan isteği başarısız: %s", exc)
+                # Ham `exc` loglanmaz: API key query string'de taşındığı için
+                # httpx'in hata mesajı isteğin tam URL'sini (key dahil) içerir.
+                logger.warning("Shodan isteği başarısız: %s", self.safe_error_message(exc))
                 return OSINTEvidence(
                     source=self.source_name, raw_data={"error": self.safe_error_message(exc)}
                 )
