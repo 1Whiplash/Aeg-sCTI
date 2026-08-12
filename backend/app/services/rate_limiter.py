@@ -7,11 +7,12 @@ istek atan uçları, kişisel/otomasyon kaynaklı aşırı kullanıma karşı ko
 Redis'e ulaşılamazsa istek engellenmez, sadece loglanır — eksik altyapı
 hatalı davranışa değil (cache.py'deki aynı prensip) düşük korumaya yol açar.
 
-NOT: Bu proje şu an Vite proxy arkasında tek bir geliştirme ortamında
-çalıştığı için istekler backend'e aynı IP'den (frontend container'ı) geliyor
-gibi görünebilir — yani bu limit pratikte "genel" bir limit gibi davranır.
-Gerçek çok-kullanıcılı bir dağıtımda ters proxy'nin X-Forwarded-For
-başlığını ilettiğinden emin olunmalı.
+İstemci IP'si varsayılan olarak `request.client.host`'tan alınır. Gerçek bir
+ters proxy arkasında dağıtılıyorsa (nginx, Vite proxy vb.) `TRUST_PROXY_HEADERS`
+ayarı açılarak `X-Forwarded-For` başlığından okunması sağlanabilir — ama bu
+başlık istemci tarafından serbestçe ayarlanabildiği için SADECE proxy'nin
+kendisi bu başlığı garanti ediyorsa güvenlidir, aksi halde limit kolayca
+sahte IP'lerle atlatılabilir (bkz. config.py'deki TRUST_PROXY_HEADERS notu).
 """
 
 import logging
@@ -26,6 +27,16 @@ logger = logging.getLogger(__name__)
 _client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
+def _resolve_client_ip(request: Request) -> str:
+    if settings.TRUST_PROXY_HEADERS:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            # Zincirdeki ilk adres orijinal istemcidir; proxy kendi eklediği
+            # sonraki adresleri virgülle ekler.
+            return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 class RateLimiter:
     """FastAPI dependency olarak kullanılır: `Depends(RateLimiter(10, 60, "analyze"))`."""
 
@@ -35,7 +46,7 @@ class RateLimiter:
         self._key_prefix = key_prefix
 
     async def __call__(self, request: Request) -> None:
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = _resolve_client_ip(request)
         key = f"aegisci:ratelimit:{self._key_prefix}:{client_ip}"
 
         try:

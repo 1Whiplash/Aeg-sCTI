@@ -124,9 +124,11 @@ $env:DOCKER_BUILDKIT="0"; $env:COMPOSE_BAKE="false"; docker compose up -d --buil
 ## Bilinen Sınırlamalar / Faz 2 Adayları
 
 - Tek admin hesabı var, çok kullanıcılı yetkilendirme yok.
-- Rate limiting istemci IP'sine göre çalışıyor; Vite proxy arkasında tüm
-  istekler aynı IP'den geliyormuş gibi görünebilir (tek-kullanıcılı Faz 1
-  için sorun değil, gerçek dağıtımda X-Forwarded-For desteği eklenmeli).
+- Rate limiting varsayılan olarak `request.client.host`'a göre çalışır.
+  Gerçek bir ters proxy arkasında dağıtılırken `.env`'de
+  `TRUST_PROXY_HEADERS=true` yapılırsa `X-Forwarded-For` başlığı okunur —
+  ama bu SADECE proxy'nin başlığı garanti ettiği ortamlarda güvenlidir,
+  aksi halde istemci limiti sahte IP'lerle atlatabilir.
 - Shodan'ın ücretsiz planı bazı "işaretli" IP'lerde (Tor node'ları vb.)
   403 dönebiliyor — hesap kısıtlaması, kod tarafında çözülemez.
 - LLM küçük bir model (7B) olduğu için nadiren hâlâ hatalı çıkarım

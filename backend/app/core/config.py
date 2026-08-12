@@ -103,6 +103,13 @@ class Settings(BaseSettings):
     # --- Loglama ---
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
+    # --- Ters Proxy ---
+    # Açıksa rate limiter istemci IP'sini X-Forwarded-For başlığından okur.
+    # SADECE gerçek, güvenilir bir ters proxy (nginx, Vite proxy vb.) bu
+    # başlığı kendisi ekleyip üzerine yazıyorsa açılmalı — aksi halde istemci
+    # başlığı serbestçe sahteleyip rate limiti tamamen atlatabilir.
+    TRUST_PROXY_HEADERS: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:
