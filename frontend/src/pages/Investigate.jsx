@@ -55,8 +55,13 @@ export default function Investigate() {
     try {
       const response = await api.blockIp(value);
       setBlockState(response);
-    } catch {
-      setBlockState({ blocked: false, message: "İstek gönderilemedi." });
+    } catch (err) {
+      if (err.status === 401) {
+        setAuthed(false);
+        setBlockState(null);
+        return;
+      }
+      setBlockState({ blocked: false, message: err.message ?? "İstek gönderilemedi." });
     }
   }
 

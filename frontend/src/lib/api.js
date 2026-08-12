@@ -1,4 +1,4 @@
-import { getToken } from "./auth";
+import { clearToken, getToken } from "./auth";
 
 const API_BASE = "/api/v1";
 
@@ -10,7 +10,12 @@ async function request(path, options = {}) {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `API isteği başarısız: ${res.status}`);
+    const error = new Error(body?.detail ?? `API isteği başarısız: ${res.status}`);
+    error.status = res.status;
+    // Token geçersiz/süresi dolmuşsa temizle ki sayfa bir sonraki render'da
+    // AdminLoginGate'i tekrar göstersin (bkz. sayfalardaki authed reset'i).
+    if (res.status === 401) clearToken();
+    throw error;
   }
   if (res.status === 204) return null;
   return res.json();

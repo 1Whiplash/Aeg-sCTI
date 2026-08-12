@@ -48,7 +48,7 @@ export default function Settings() {
       loadEntries();
     } catch (err) {
       setError(err.message);
-      if (err.message?.includes("giriş")) setAuthed(false);
+      if (err.status === 401) setAuthed(false);
     } finally {
       setSubmitting(false);
     }
@@ -59,8 +59,8 @@ export default function Settings() {
       await api.deleteWhitelistEntry(id);
       setEntries((prev) => prev.filter((entry) => entry.id !== id));
     } catch (err) {
-      setError("Kayıt silinemedi.");
-      if (err.message?.includes("giriş")) setAuthed(false);
+      setError(err.status === 401 ? "Oturum süresi doldu, tekrar giriş yapın." : "Kayıt silinemedi.");
+      if (err.status === 401) setAuthed(false);
     }
   }
 
