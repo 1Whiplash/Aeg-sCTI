@@ -16,6 +16,7 @@ from app.models.search_history import SearchHistory
 from app.schemas.ioc import IOCAnalysisRequest, IOCAnalysisResponse
 from app.services.aggregator import OSINTAggregator
 from app.services.cache import AnalysisCache
+from app.services.geo import extract_geo
 from app.services.interfaces import ICTIProvider
 from app.services.ollama_service import OllamaAnalysisService
 from app.services.risk_engine import RiskEngine
@@ -55,6 +56,7 @@ class AggregatedCTIProvider(ICTIProvider):
             llm_analysis=llm_result.threat_summary,
             recommended_actions=llm_result.recommended_actions,
             osint_evidence=osint_evidence,
+            geo=extract_geo(request.ioc_type, osint_evidence),
         )
 
         await self._persist(response)
