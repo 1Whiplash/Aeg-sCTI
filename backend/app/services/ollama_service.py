@@ -109,6 +109,11 @@ class OllamaAnalysisService(ILLMEnrichmentService):
             "prompt": prompt,
             "stream": False,
             "format": LLMAnalysisResult.model_json_schema(),
+            # Risk skorlaması bir sınıflandırma görevi, yaratıcılığa gerek yok.
+            # Düşük sıcaklık olmadan aynı kanıtlarla her çağrıda farklı bir
+            # risk_score/metin üretiliyordu (bkz. Aktivite geçmişindeki
+            # google.com için 21-42 arası savrulan skorlar).
+            "options": {"temperature": 0.1, "seed": 42},
         }
 
         async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
