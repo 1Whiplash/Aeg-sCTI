@@ -32,5 +32,9 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   deleteWhitelistEntry: (id) => request(`/whitelist/${id}`, { method: "DELETE" }),
-  listHistory: (limit = 100) => request(`/history?limit=${limit}`),
+  listHistory: (limit = 100, minRiskScore = null) => {
+    const params = new URLSearchParams({ limit });
+    if (minRiskScore !== null) params.set("min_risk_score", minRiskScore);
+    return request(`/history?${params.toString()}`);
+  },
 };

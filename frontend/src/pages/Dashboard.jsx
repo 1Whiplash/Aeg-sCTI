@@ -3,23 +3,41 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { api } from "@/lib/api";
 
-const STAT_CARDS = [
-  { label: "Açık Uyarılar", value: "—", variant: "high" },
-  { label: "Kritik IOC", value: "—", variant: "critical" },
-  { label: "İncelenen Gösterge (24s)", value: "—", variant: "info" },
-  { label: "Sistem Modu", value: "Read-Only", variant: "low" },
-];
+const ALERT_THRESHOLD = 50;
+const CRITICAL_THRESHOLD = 80;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export default function Dashboard() {
   const [health, setHealth] = useState(null);
   const [error, setError] = useState(null);
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
     api
       .health()
       .then(setHealth)
       .catch(() => setError("Backend'e ulaşılamadı."));
+
+    api
+      .listHistory(200)
+      .then((items) => {
+        const now = Date.now();
+        setStats({
+          openAlerts: items.filter((item) => item.risk_score >= ALERT_THRESHOLD).length,
+          criticalCount: items.filter((item) => item.risk_score >= CRITICAL_THRESHOLD).length,
+          last24h: items.filter((item) => now - new Date(item.created_at).getTime() < ONE_DAY_MS)
+            .length,
+        });
+      })
+      .catch(() => {});
   }, []);
+
+  const statCards = [
+    { label: "Açık Uyarılar", value: stats?.openAlerts ?? "—", variant: "high" },
+    { label: "Kritik IOC", value: stats?.criticalCount ?? "—", variant: "critical" },
+    { label: "İncelenen Gösterge (24s)", value: stats?.last24h ?? "—", variant: "info" },
+    { label: "Sistem Modu", value: "Read-Only", variant: "low" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -31,7 +49,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {STAT_CARDS.map((stat) => (
+        {statCards.map((stat) => (
           <Card key={stat.label}>
             <CardHeader>
               <CardTitle>{stat.label}</CardTitle>

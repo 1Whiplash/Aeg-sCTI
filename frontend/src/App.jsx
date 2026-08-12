@@ -2,18 +2,10 @@ import { Route, HashRouter as Router, Routes } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import Activity from "@/pages/Activity";
+import Alerts from "@/pages/Alerts";
 import Dashboard from "@/pages/Dashboard";
 import Investigate from "@/pages/Investigate";
 import Settings from "@/pages/Settings";
-
-function Placeholder({ title }) {
-  return (
-    <div>
-      <h1 className="text-xl font-bold text-foreground">{title}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Bu modül henüz geliştirilme aşamasında.</p>
-    </div>
-  );
-}
 
 export default function App() {
   return (
@@ -26,7 +18,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/investigate" element={<Investigate />} />
-              <Route path="/alerts" element={<Placeholder title="Uyarılar" />} />
+              <Route path="/alerts" element={<Alerts />} />
               <Route path="/activity" element={<Activity />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
