@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import Dashboard from "@/pages/Dashboard";
 import Investigate from "@/pages/Investigate";
+import Settings from "@/pages/Settings";
 
 function Placeholder({ title }) {
   return (
@@ -26,7 +27,7 @@ export default function App() {
               <Route path="/investigate" element={<Investigate />} />
               <Route path="/alerts" element={<Placeholder title="Uyarılar" />} />
               <Route path="/activity" element={<Placeholder title="Aktivite" />} />
-              <Route path="/settings" element={<Placeholder title="Ayarlar" />} />
+              <Route path="/settings" element={<Settings />} />
             </Routes>
           </main>
         </div>

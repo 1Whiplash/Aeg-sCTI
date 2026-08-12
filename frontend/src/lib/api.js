@@ -6,8 +6,10 @@ async function request(path, options = {}) {
     ...options,
   });
   if (!res.ok) {
-    throw new Error(`API isteği başarısız: ${res.status}`);
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `API isteği başarısız: ${res.status}`);
   }
+  if (res.status === 204) return null;
   return res.json();
 }
 
@@ -23,4 +25,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ ip_address: ipAddress }),
     }),
+  listWhitelist: () => request("/whitelist"),
+  addWhitelistEntry: (payload) =>
+    request("/whitelist", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  deleteWhitelistEntry: (id) => request(`/whitelist/${id}`, { method: "DELETE" }),
 };
