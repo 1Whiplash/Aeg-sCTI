@@ -16,6 +16,13 @@ const LINE_HEIGHT = 5;
 const RAW_LINE_HEIGHT = 3.6;
 const MAX_RAW_LINES = 25;
 
+const SOURCE_LABELS = {
+  virustotal: "VIRUSTOTAL",
+  abuseipdb: "ABUSEIPDB",
+  shodan: "SHODAN",
+  web_scraper: "WHOIS / WEB TARAMASI",
+};
+
 const TR_TO_ASCII = {
   ç: "c",
   Ç: "C",
@@ -149,6 +156,29 @@ function summarizeEvidence(item) {
     return lines.length > 0 ? lines : null;
   }
 
+  if (item.source === "web_scraper" && data) {
+    if (data.skipped_reason) {
+      return [`Guvenlik nedeniyle taranmadi: ${data.skipped_reason}`];
+    }
+
+    const lines = [];
+    if (data.page_title) lines.push(`Sayfa basligi: ${data.page_title}`);
+    if (data.status_code) lines.push(`HTTP durum kodu: ${data.status_code}`);
+    if (data.redirect_location) lines.push(`Yonlendirme hedefi: ${data.redirect_location}`);
+    if (data.fetch_error) lines.push(`Sayfa taranamadi: ${data.fetch_error}`);
+
+    if (data.whois_registrar) lines.push(`WHOIS kayit sirketi: ${data.whois_registrar}`);
+    if (data.whois_creation_date) lines.push(`WHOIS olusturulma tarihi: ${data.whois_creation_date}`);
+    if (data.whois_error) lines.push(`WHOIS sorgusu yapilamadi: ${data.whois_error}`);
+
+    if (typeof data.ssl_cert_age_days === "number") {
+      lines.push(`SSL sertifika yasi: ${data.ssl_cert_age_days} gun`);
+    }
+    if (data.ssl_error) lines.push(`SSL sertifika bilgisi alinamadi: ${data.ssl_error}`);
+
+    return lines.length > 0 ? lines : null;
+  }
+
   return null;
 }
 
@@ -166,7 +196,7 @@ function drawEvidenceBlock(doc, item, y, pageHeight, accentColor) {
   doc.setFont(undefined, "bold");
   doc.setFontSize(9);
   doc.setTextColor(...accentColor);
-  doc.text(pdfSafe(item.source).toUpperCase(), MARGIN_X, y);
+  doc.text(SOURCE_LABELS[item.source] ?? pdfSafe(item.source).toUpperCase(), MARGIN_X, y);
   doc.setFont(undefined, "normal");
   doc.setTextColor(60, 60, 60);
   y += 5;
