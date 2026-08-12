@@ -1,10 +1,10 @@
-import { Search } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/Badge";
 import { detectIocType } from "@/lib/detectIocType";
 
-export function Header() {
+export function Header({ onMenuClick }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -34,6 +34,14 @@ export function Header() {
 
   return (
     <header className="flex items-center gap-3 border-b border-border bg-card/50 px-6 py-3">
+      <button
+        type="button"
+        onClick={onMenuClick}
+        aria-label="Menüyü aç"
+        className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
       <form onSubmit={handleSubmit} className="flex flex-1 items-center gap-2">
         <div className="relative max-w-xl flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
