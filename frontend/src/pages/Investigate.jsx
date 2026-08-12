@@ -157,6 +157,12 @@ export default function Investigate() {
                         </li>
                       ))}
                     </ul>
+                    <p className="mt-2 text-xs italic text-muted-foreground">
+                      Not: Bu öneriler LLM tarafından üretildi ve bazen hedefi doğrudan
+                      yönetebileceğinizi varsayan ifadeler içerebilir. Gösterge sizin
+                      kontrolünüzde değilse (çoğu durumda öyledir), sadece izleme/engelleme
+                      adımlarını uygulayın.
+                    </p>
                   </div>
                 )}
               </CardContent>

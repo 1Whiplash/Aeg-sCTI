@@ -294,6 +294,24 @@ export function exportAnalysisPdf(result) {
       }
       y += 1;
     });
+    doc.setFont(undefined, "italic");
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    const disclaimer = doc.splitTextToSize(
+      pdfSafe(
+        "Not: Bu oneriler LLM tarafindan uretildi ve bazen hedefi dogrudan yonetebileceginizi " +
+          "varsayan ifadeler icerebilir. Gosterge sizin kontrolunuzde degilse, sadece " +
+          "izleme/engelleme adimlarini uygulayin.",
+      ),
+      MAX_WIDTH,
+    );
+    for (const line of disclaimer) {
+      y = ensureSpace(doc, y, pageHeight);
+      doc.text(line, MARGIN_X, y);
+      y += RAW_LINE_HEIGHT;
+    }
+    doc.setFont(undefined, "normal");
+    doc.setTextColor(40, 40, 40);
     y += 4;
   }
 
