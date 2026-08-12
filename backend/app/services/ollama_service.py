@@ -25,7 +25,13 @@ _SYSTEM_PROMPT = (
     "İngilizce olsa dahi, kesinlikle ve eksiksiz TÜRKÇE olmalıdır. Tek bir İngilizce kelime "
     "veya cümle bile kullanma; teknik terimlerin de Türkçe karşılığını kullan.\n"
     "2. Profesyonel bir SOC analistinin kurumsal raporlama diliyle, net, teknik ama anlaşılır yaz.\n"
-    "3. SADECE istenen JSON şemasına uyan bir çıktı üret. Ek açıklama, yorum veya markdown "
+    "3. `risk_score`'u SADECE somut, olumsuz kanıta dayandır (örn. VirusTotal motor tespiti, "
+    "gerçek kötüye kullanım şikayeti, bilinen zararlı IP/domain/hash eşleşmesi). SSL sertifikası, "
+    "SPF/DKIM/DMARC, CAA kaydı gibi standart güvenlik önlemlerinin VARLIĞI her zaman OLUMLU bir "
+    "işarettir — bunları ASLA risk gerekçesi olarak gösterme. Çok sayıda TXT/DNS kaydı büyük "
+    "kurumsal sitelerde normaldir ve tek başına şüpheli değildir. Somut kötü niyet kanıtı yoksa "
+    "risk_score düşük olmalıdır (0-20 aralığı).\n"
+    "4. SADECE istenen JSON şemasına uyan bir çıktı üret. Ek açıklama, yorum veya markdown "
     "ekleme; sadece geçerli JSON döndür."
 )
 
