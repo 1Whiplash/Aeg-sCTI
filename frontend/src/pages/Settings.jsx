@@ -54,7 +54,8 @@ export default function Settings() {
     }
   }
 
-  async function handleDelete(id) {
+  async function handleDelete(id, value) {
+    if (!window.confirm(`"${value}" whitelist'ten silinsin mi?`)) return;
     try {
       await api.deleteWhitelistEntry(id);
       setEntries((prev) => prev.filter((entry) => entry.id !== id));
@@ -163,7 +164,7 @@ export default function Settings() {
                         <td className="py-2 text-right">
                           <button
                             type="button"
-                            onClick={() => handleDelete(entry.id)}
+                            onClick={() => handleDelete(entry.id, entry.value)}
                             className="text-muted-foreground hover:text-critical"
                             aria-label="Sil"
                           >
