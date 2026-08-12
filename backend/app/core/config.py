@@ -28,7 +28,11 @@ class Settings(BaseSettings):
     APP_NAME: str = "AegisCTI"
     APP_VERSION: str = "0.1.0"
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
-    DEBUG: bool = True
+    # Güvenli varsayılan: SQLAlchemy echo (ham SQL sorgu loglaması) sadece
+    # .env'de açıkça DEBUG=true denirse aktif olur (bkz. .env.example).
+    # Aksi halde .env eksik/atlanmış bir dağıtımda yanlışlıkla verbose SQL
+    # loglaması production'da açık kalabilirdi.
+    DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
 
     # Faz 1: Sistem salt-okunur (Read-Only) modda çalışır.
