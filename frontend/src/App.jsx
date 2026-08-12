@@ -1,6 +1,7 @@
 import { Route, HashRouter as Router, Routes } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
+import Activity from "@/pages/Activity";
 import Dashboard from "@/pages/Dashboard";
 import Investigate from "@/pages/Investigate";
 import Settings from "@/pages/Settings";
@@ -26,7 +27,7 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/investigate" element={<Investigate />} />
               <Route path="/alerts" element={<Placeholder title="Uyarılar" />} />
-              <Route path="/activity" element={<Placeholder title="Aktivite" />} />
+              <Route path="/activity" element={<Activity />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </main>

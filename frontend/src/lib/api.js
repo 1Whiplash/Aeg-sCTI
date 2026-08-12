@@ -32,4 +32,5 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   deleteWhitelistEntry: (id) => request(`/whitelist/${id}`, { method: "DELETE" }),
+  listHistory: (limit = 100) => request(`/history?limit=${limit}`),
 };
