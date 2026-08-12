@@ -136,3 +136,8 @@ $env:DOCKER_BUILDKIT="0"; $env:COMPOSE_BAKE="false"; docker compose up -d --buil
   koruması var ama %100 garanti değil.
 - `FORTIGATE_AUTO_BLOCK_ENABLED` ve `READ_ONLY_MODE` Faz 2'de gerçek
   otomatik müdahale için etkinleştirilecek — şu an ikisi de pasif.
+- Ollama tek seferde bir çıkarım işleyebiliyor; birden fazla analist aynı
+  anda analiz isteği gönderirse (paralel kullanım) istekler kuyruğa girip
+  tek başına ~20-25 saniye süren bir analiz 60-100+ saniyeye çıkabiliyor.
+  Faz 2'de gerçek çok-kullanıcılı kullanım için bir istek kuyruğu/öncelik
+  mekanizması ya da birden fazla model instance'ı değerlendirilmeli.
