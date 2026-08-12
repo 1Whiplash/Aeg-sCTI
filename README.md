@@ -104,6 +104,13 @@ docker exec aegisci-backend alembic upgrade head
 - Backend API dokümantasyonu: http://localhost:8000/docs
 - Ollama: http://localhost:11434
 
+## Testler
+
+```bash
+docker exec aegisci-backend pytest tests/ -v
+docker exec aegisci-frontend npm test
+```
+
 **Not (Windows):** `npm install` Docker build sırasında bazen BuildKit
 kaynaklı ağ sorunları yüzünden takılabiliyor. Takılırsa:
 ```bash
