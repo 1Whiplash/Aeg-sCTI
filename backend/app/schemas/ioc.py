@@ -64,4 +64,8 @@ class IOCAnalysisResponse(BaseModel):
     recommended_actions: list[str] = Field(default_factory=list, description="LLM'in önerdiği SOC aksiyon planı")
     osint_evidence: list[OSINTEvidence] = Field(default_factory=list)
     geo: GeoLocation | None = Field(None, description="Gösterge IP ise coğrafi konumu (varsa)")
+    exposed_services: list[str] = Field(
+        default_factory=list,
+        description="Shodan'a göre açık, yaygın olarak istismar edilen servisler (risk_score'u etkilemez)",
+    )
     analyzed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

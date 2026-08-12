@@ -297,6 +297,32 @@ export function exportAnalysisPdf(result) {
     y += 4;
   }
 
+  if (result.exposed_services?.length > 0) {
+    y = ensureSpace(doc, y, pageHeight, 20);
+    drawSectionTitle(doc, "Acika Cikan Riskli Servisler", y, accentColor);
+    y += 8;
+    doc.setFontSize(10);
+    doc.setTextColor(40, 40, 40);
+    doc.text(pdfSafe(result.exposed_services.join(", ")), MARGIN_X, y);
+    y += LINE_HEIGHT + 3;
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.setFont(undefined, "italic");
+    const note = doc.splitTextToSize(
+      pdfSafe(
+        "Shodan'a gore acik - risk skorunu etkilemez, saldiri yuzeyi hakkinda bilgi verir.",
+      ),
+      MAX_WIDTH,
+    );
+    for (const line of note) {
+      y = ensureSpace(doc, y, pageHeight);
+      doc.text(line, MARGIN_X, y);
+      y += RAW_LINE_HEIGHT;
+    }
+    doc.setFont(undefined, "normal");
+    y += 4;
+  }
+
   y = ensureSpace(doc, y, pageHeight, 25);
   drawSectionTitle(doc, "OSINT Kanitlari", y, accentColor);
   y += 8;

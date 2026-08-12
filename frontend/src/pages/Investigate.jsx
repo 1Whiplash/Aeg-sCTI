@@ -1,4 +1,4 @@
-import { Bot, CheckCircle2, FileDown, MapPin } from "lucide-react";
+import { Bot, CheckCircle2, FileDown, MapPin, Radar } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AdminLoginGate } from "@/components/ui/AdminLoginGate";
@@ -162,6 +162,31 @@ export default function Investigate() {
               </CardContent>
             </Card>
           </div>
+
+          {result.exposed_services?.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Radar className="h-4 w-4 text-medium" />
+                  <CardTitle>Açığa Çıkan Riskli Servisler</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {result.exposed_services.map((service) => (
+                    <Badge key={service} variant="medium">
+                      {service}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Shodan'a göre bu hedefte açık — risk skorunu etkilemez, sadece saldırı yüzeyi
+                  hakkında bilgi verir. Hedef sizin kontrolünüzde değilse doğrudan müdahale
+                  edemeyebilirsiniz; izleme/engelleme önerilerine bakın.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {result.geo && (
             <Card>
