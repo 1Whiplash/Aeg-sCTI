@@ -7,6 +7,7 @@ from app.core.enums import IOCType
 from app.schemas.ioc import OSINTEvidence
 from app.services.abuseipdb import AbuseIPDBCollector
 from app.services.base_collector import BaseCollector
+from app.services.otx import OTXCollector
 from app.services.shodan import ShodanCollector
 from app.services.virustotal import VirusTotalCollector
 from app.services.web_scraper import WebScraperCollector
@@ -22,6 +23,7 @@ class OSINTAggregator:
             VirusTotalCollector(),
             AbuseIPDBCollector(),
             ShodanCollector(),
+            OTXCollector(),
         ]
         self._scraper = WebScraperCollector()
 

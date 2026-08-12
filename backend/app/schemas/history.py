@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from app.core.enums import IOCType, Severity
+from app.schemas.geo import GeoLocation
 
 
 class SearchHistoryItem(BaseModel):
@@ -16,4 +17,5 @@ class SearchHistoryItem(BaseModel):
     risk_score: int
     severity: Severity
     llm_summary: str | None
+    geo: GeoLocation | None = None
     created_at: datetime

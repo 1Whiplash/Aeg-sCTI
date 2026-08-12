@@ -28,6 +28,7 @@ class SearchHistory(Base):
     )
     llm_summary: Mapped[str | None] = mapped_column(String, nullable=True)
     osint_raw: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    geo: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

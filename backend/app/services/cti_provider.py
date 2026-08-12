@@ -74,6 +74,7 @@ class AggregatedCTIProvider(ICTIProvider):
                 "evidence": [item.model_dump(mode="json") for item in response.osint_evidence],
                 "recommended_actions": response.recommended_actions,
             },
+            geo=response.geo.model_dump(mode="json") if response.geo else None,
         )
         self._db.add(entry)
         await self._db.commit()
