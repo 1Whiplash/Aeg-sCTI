@@ -35,4 +35,6 @@ class ShodanCollector(BaseCollector):
                 return OSINTEvidence(source=self.source_name, raw_data=response.json())
             except httpx.HTTPError as exc:
                 logger.warning("Shodan isteği başarısız: %s", exc)
-                return OSINTEvidence(source=self.source_name, raw_data={"error": str(exc)})
+                return OSINTEvidence(
+                    source=self.source_name, raw_data={"error": self.safe_error_message(exc)}
+                )

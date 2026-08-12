@@ -2,6 +2,8 @@
 
 from abc import ABC, abstractmethod
 
+import httpx
+
 from app.core.enums import IOCType
 from app.schemas.ioc import OSINTEvidence
 
@@ -24,3 +26,20 @@ class BaseCollector(ABC):
         Kaynağa ulaşılamazsa exception fırlatmaz; hatayı `raw_data={"error": ...}` içinde taşır.
         """
         raise NotImplementedError
+
+    @staticmethod
+    def safe_error_message(exc: Exception) -> str:
+        """Hata mesajını kullanıcıya güvenli hale getirir.
+
+        httpx'in varsayılan hata mesajları, isteğin tam URL'sini (bazı kaynaklarda
+        API key query parametresi olarak URL'nin içinde olabiliyor) içerir. Bu mesaj
+        doğrudan ekrana/PDF'e yazıldığı için ham `str(exc)` ASLA kullanılmamalı —
+        sadece durum koduna dayanan, sızıntı riski taşımayan bir özet döneriz.
+        """
+        if isinstance(exc, httpx.HTTPStatusError):
+            return f"HTTP {exc.response.status_code} hatası"
+        if isinstance(exc, httpx.TimeoutException):
+            return "İstek zaman aşımına uğradı"
+        if isinstance(exc, httpx.HTTPError):
+            return "Ağ isteği başarısız oldu"
+        return "Bilinmeyen hata"

@@ -58,7 +58,10 @@ export function ThreatMap({ lat, lon, label, severity, points }) {
   const showLabels = markers.length === 1;
 
   return (
-    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full rounded-md border border-border bg-background">
+    <svg
+      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+      className="mx-auto block w-full max-w-xl rounded-md border border-border bg-background"
+    >
       {COUNTRY_PATHS.map((d, i) => (
         <path
           key={i}
