@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     def REDIS_URL(self) -> str:
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
 
+    # Aynı IOC'nin bu süre içinde tekrar sorgulanması önbellekten karşılanır.
+    CACHE_TTL_SECONDS: int = 1200  # 20 dakika
+
     # --- Ollama / LLM (Qwen 2.5) ---
     OLLAMA_BASE_URL: str = "http://ollama:11434"
     OLLAMA_MODEL: str = "qwen2.5:7b"

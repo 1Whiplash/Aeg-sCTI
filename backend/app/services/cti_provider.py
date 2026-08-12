@@ -2,7 +2,8 @@
 
 OSINT toplama (aggregator) → LLM analizi (ollama_service) → risk skorlama
 (risk_engine) zincirini çalıştırır ve sonucu `search_history` tablosuna
-kalıcı olarak kaydeder.
+kalıcı olarak kaydeder. Aynı IOC kısa süre içinde tekrar sorgulanırsa
+sonuç Redis önbelleğinden dönülür, zincir yeniden çalıştırılmaz.
 """
 
 import logging
@@ -14,6 +15,7 @@ from app.db.session import get_db_session
 from app.models.search_history import SearchHistory
 from app.schemas.ioc import IOCAnalysisRequest, IOCAnalysisResponse
 from app.services.aggregator import OSINTAggregator
+from app.services.cache import AnalysisCache
 from app.services.interfaces import ICTIProvider
 from app.services.ollama_service import OllamaAnalysisService
 from app.services.risk_engine import RiskEngine
@@ -29,8 +31,14 @@ class AggregatedCTIProvider(ICTIProvider):
         self._aggregator = OSINTAggregator()
         self._llm_service = OllamaAnalysisService()
         self._risk_engine = RiskEngine()
+        self._cache = AnalysisCache()
 
     async def lookup(self, request: IOCAnalysisRequest) -> IOCAnalysisResponse:
+        cached = await self._cache.get(request.ioc_type.value, request.value)
+        if cached is not None:
+            logger.info("Önbellekten dönülüyor: %s (%s)", request.value, request.ioc_type)
+            return IOCAnalysisResponse.model_validate(cached)
+
         logger.info("IOC sorgulanıyor: %s (%s)", request.value, request.ioc_type)
 
         osint_evidence = await self._aggregator.gather(request.value, request.ioc_type)
@@ -50,6 +58,7 @@ class AggregatedCTIProvider(ICTIProvider):
         )
 
         await self._persist(response)
+        await self._cache.set(request.ioc_type.value, request.value, response.model_dump(mode="json"))
         return response
 
     async def _persist(self, response: IOCAnalysisResponse) -> None:
