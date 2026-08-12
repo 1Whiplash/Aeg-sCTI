@@ -1,18 +1,51 @@
 """IOC (Indicator of Compromise) analiz istek/yanıt şemaları."""
 
+import ipaddress
 from datetime import datetime, timezone
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.core.enums import IOCType, Severity
 from app.schemas.geo import GeoLocation
 
 __all__ = ["IOCType", "Severity", "IOCAnalysisRequest", "OSINTEvidence", "IOCAnalysisResponse"]
 
+_HASH_LENGTHS = {32, 40, 64}  # MD5, SHA1, SHA256
+
 
 class IOCAnalysisRequest(BaseModel):
-    value: str = Field(..., description="Analiz edilecek gösterge (IP, domain, hash, url)")
+    value: str = Field(
+        ..., min_length=1, max_length=2048, description="Analiz edilecek gösterge (IP, domain, hash, url)"
+    )
     ioc_type: IOCType
+
+    @field_validator("value")
+    @classmethod
+    def strip_value(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Boş gösterge analiz edilemez.")
+        return stripped
+
+    @model_validator(mode="after")
+    def validate_value_matches_type(self) -> "IOCAnalysisRequest":
+        if self.ioc_type == IOCType.IP:
+            try:
+                ipaddress.ip_address(self.value)
+            except ValueError as exc:
+                raise ValueError("Geçerli bir IP adresi değil.") from exc
+        elif self.ioc_type == IOCType.HASH:
+            if len(self.value) not in _HASH_LENGTHS or not all(
+                c in "0123456789abcdefABCDEF" for c in self.value
+            ):
+                raise ValueError("Geçerli bir MD5/SHA1/SHA256 hash'i değil.")
+        elif self.ioc_type == IOCType.URL:
+            if not self.value.startswith(("http://", "https://")):
+                raise ValueError("URL, http:// veya https:// ile başlamalı.")
+        elif self.ioc_type == IOCType.DOMAIN:
+            if " " in self.value or "/" in self.value:
+                raise ValueError("Geçerli bir domain adı değil.")
+        return self
 
 
 class OSINTEvidence(BaseModel):
