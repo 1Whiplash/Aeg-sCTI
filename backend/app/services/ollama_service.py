@@ -2,9 +2,16 @@
 
 Model çıktısı, Ollama'nın `format` parametresine `LLMAnalysisResult`'ın JSON şeması
 verilerek zorlanır — yani model şemaya uymayan bir metin üretemez.
+
+Küçük (7B) model bazen prompt talimatına rağmen yanıtın içine yabancı alfabe
+(Çince/Japonca/Kiril/Arapça) karıştırabiliyor. Bu, prompt sıkılaştırmasıyla
+tamamen önlenemediği için ek bir güvence katmanı var: çıktı kontrol edilir,
+kirlenme tespit edilirse bir kez daha (daha sert bir uyarıyla) denenir; hâlâ
+düzelmezse kullanıcıya bozuk metin göstermek yerine güvenli bir mesaja düşülür.
 """
 
 import logging
+import re
 
 import httpx
 
@@ -22,8 +29,9 @@ _SYSTEM_PROMPT = (
     "(bu ham veri İngilizce olabilir, kaynak API'lerden geldiği gibi kalır).\n\n"
     "KURALLAR:\n"
     "1. `threat_summary` ve `recommended_actions` alanlarındaki TÜM metin, ham OSINT verisi "
-    "İngilizce olsa dahi, kesinlikle ve eksiksiz TÜRKÇE olmalıdır. Tek bir İngilizce kelime "
-    "veya cümle bile kullanma; teknik terimlerin de Türkçe karşılığını kullan.\n"
+    "İngilizce olsa dahi, kesinlikle ve eksiksiz TÜRKÇE olmalıdır. Tek bir İngilizce, Çince, "
+    "Japonca, Korece, Rusça veya başka bir dilden kelime/cümle bile kullanma; teknik terimlerin "
+    "de Türkçe karşılığını kullan.\n"
     "2. Profesyonel bir SOC analistinin kurumsal raporlama diliyle, net, teknik ama anlaşılır yaz.\n"
     "3. `risk_score`'u SADECE somut, olumsuz kanıta dayandır (örn. VirusTotal motor tespiti, "
     "gerçek kötüye kullanım şikayeti, bilinen zararlı IP/domain/hash eşleşmesi). SSL sertifikası, "
@@ -41,6 +49,11 @@ _FALLBACK_RESULT = LLMAnalysisResult(
     recommended_actions=[],
 )
 
+# CJK (Çince/Japonca), Hangul (Korece), Kiril ve Arapça alfabe aralıkları.
+_NON_TURKISH_SCRIPT = re.compile(
+    r"[一-鿿぀-ヿ가-힯Ѐ-ӿ؀-ۿ]"
+)
+
 
 class OllamaAnalysisService(ILLMEnrichmentService):
     """Ollama'nın /api/generate uç noktasını çağıran async istemci."""
@@ -53,7 +66,42 @@ class OllamaAnalysisService(ILLMEnrichmentService):
     async def analyze(
         self, value: str, ioc_type: IOCType, osint_evidence: list[OSINTEvidence]
     ) -> LLMAnalysisResult:
-        prompt = self._build_prompt(value, ioc_type, osint_evidence)
+        result = await self._generate(value, ioc_type, osint_evidence)
+
+        if result is not None and self._is_contaminated(result):
+            logger.warning(
+                "LLM çıktısında yabancı alfabe tespit edildi (%s), sıkılaştırılmış promptla tekrar deneniyor.",
+                value,
+            )
+            retry = await self._generate(value, ioc_type, osint_evidence, reinforce=True)
+            result = retry if retry is not None else result
+
+        if result is None:
+            return _FALLBACK_RESULT
+
+        if self._is_contaminated(result):
+            logger.error(
+                "LLM ikinci denemede de Türkçe kuralına uymadı (%s), güvenli mesaja düşülüyor.", value
+            )
+            return LLMAnalysisResult(
+                risk_score=result.risk_score,
+                threat_summary=(
+                    "LLM bu gösterge için güvenilir bir Türkçe özet üretemedi. "
+                    "Aşağıdaki OSINT kanıtlarını manuel olarak inceleyin."
+                ),
+                recommended_actions=["OSINT kanıtlarını manuel olarak gözden geçirin."],
+            )
+
+        return result
+
+    async def _generate(
+        self,
+        value: str,
+        ioc_type: IOCType,
+        osint_evidence: list[OSINTEvidence],
+        reinforce: bool = False,
+    ) -> LLMAnalysisResult | None:
+        prompt = self._build_prompt(value, ioc_type, osint_evidence, reinforce)
 
         payload = {
             "model": self._model,
@@ -71,20 +119,36 @@ class OllamaAnalysisService(ILLMEnrichmentService):
                 return LLMAnalysisResult.model_validate_json(raw_output)
             except httpx.HTTPError as exc:
                 logger.error("Ollama isteği başarısız: %s", exc)
-                return _FALLBACK_RESULT
+                return None
             except ValueError as exc:
                 logger.error("Ollama çıktısı beklenen şemaya uymuyor: %s", exc)
-                return _FALLBACK_RESULT
+                return None
 
     @staticmethod
-    def _build_prompt(value: str, ioc_type: IOCType, osint_evidence: list[OSINTEvidence]) -> str:
+    def _is_contaminated(result: LLMAnalysisResult) -> bool:
+        combined = result.threat_summary + " ".join(result.recommended_actions)
+        return bool(_NON_TURKISH_SCRIPT.search(combined))
+
+    @staticmethod
+    def _build_prompt(
+        value: str, ioc_type: IOCType, osint_evidence: list[OSINTEvidence], reinforce: bool
+    ) -> str:
         evidence_json = [item.model_dump(mode="json") for item in osint_evidence]
-        return (
-            f"Gösterge: {value} (tip: {ioc_type.value})\n\n"
-            f"Toplanan OSINT kanıtları:\n{evidence_json}\n\n"
+        reminder = (
             "HATIRLATMA: `threat_summary` ve `recommended_actions` alanlarını baştan sona "
             "MUTLAKA TÜRKÇE yaz. Yukarıdaki OSINT verisi İngilizce olsa bile, cevabında tek "
-            "bir İngilizce kelime veya cümle KULLANMA."
+            "bir İngilizce/Çince/Japonca/Korece/Rusça kelime veya cümle KULLANMA."
+        )
+        if reinforce:
+            reminder = (
+                "SON UYARI: Önceki cevabın Türkçe DIŞINDA bir alfabe (Çince/Japonca/Korece/Kiril/"
+                "Arapça) içeriyordu, bu KABUL EDİLEMEZ. Bu kez `threat_summary` ve "
+                "`recommended_actions` alanlarındaki HER KELİME sadece Türk alfabesindeki "
+                "harflerden (a-z, ç, ğ, ı, ö, ş, ü) oluşmalı. Başka hiçbir alfabe kullanma."
+            )
+        return (
+            f"Gösterge: {value} (tip: {ioc_type.value})\n\n"
+            f"Toplanan OSINT kanıtları:\n{evidence_json}\n\n{reminder}"
         )
 
 

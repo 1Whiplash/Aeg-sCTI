@@ -1,4 +1,4 @@
-import { Bot, CheckCircle2, FileDown, MapPin, ShieldBan } from "lucide-react";
+import { Bot, CheckCircle2, FileDown, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AdminLoginGate } from "@/components/ui/AdminLoginGate";
@@ -103,7 +103,7 @@ export default function Investigate() {
                 disabled={blockState === "loading"}
                 className="inline-flex items-center gap-2 rounded-md border border-critical/40 bg-critical/10 px-3 py-2 text-sm font-medium text-critical hover:bg-critical/20 disabled:opacity-50"
               >
-                <ShieldBan className="h-4 w-4" />
+                <img src="/fortigate-logo.png" alt="FortiGate" className="h-4 w-4" />
                 {blockState === "loading" ? "Gönderiliyor..." : "FortiGate'e Kural Bas"}
               </button>
             )}
