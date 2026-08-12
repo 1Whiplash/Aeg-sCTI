@@ -20,9 +20,11 @@ const SEVERITY_COLOR = {
 function Marker({ lat, lon, severity, label, showLabel }) {
   const [x, y] = projection([lon, lat]) ?? [WIDTH / 2, HEIGHT / 2];
   const color = SEVERITY_COLOR[severity] ?? "hsl(var(--primary))";
+  const tooltip = `${label ? `${label} · ` : ""}${lat.toFixed(2)}, ${lon.toFixed(2)}`;
 
   return (
-    <g>
+    <g className="cursor-pointer">
+      <title>{tooltip}</title>
       <circle cx={x} cy={y} r={9} fill={color} opacity={0.3}>
         <animate attributeName="r" values="6;14;6" dur="2s" repeatCount="indefinite" />
         <animate attributeName="opacity" values="0.4;0.05;0.4" dur="2s" repeatCount="indefinite" />

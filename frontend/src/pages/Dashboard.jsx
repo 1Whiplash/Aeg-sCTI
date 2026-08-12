@@ -46,6 +46,7 @@ export default function Dashboard() {
             lat: item.geo.lat,
             lon: item.geo.lon,
             severity: item.severity,
+            label: [item.ioc_value, item.geo.city, item.geo.country].filter(Boolean).join(" · "),
           })),
         );
         setRecentAlerts(withGeo.filter((item) => item.risk_score >= ALERT_THRESHOLD).slice(0, 8));
