@@ -62,7 +62,11 @@ class RiskEngine:
 
     @staticmethod
     async def _is_whitelisted(db: AsyncSession, value: str) -> bool:
-        result = await db.execute(select(Whitelist.id).where(Whitelist.value == value))
+        # Whitelist kayıtları küçük harfle saklanıyor (bkz. whitelist.py); domain'ler
+        # DNS gereği büyük/küçük harf duyarsız olduğu için karşılaştırma da öyle olmalı.
+        result = await db.execute(
+            select(Whitelist.id).where(Whitelist.value == value.strip().lower())
+        )
         return result.scalar_one_or_none() is not None
 
     @staticmethod

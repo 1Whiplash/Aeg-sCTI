@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     # --- Güvenlik ---
     SECRET_KEY: str = Field(default="CHANGE_ME_IN_PRODUCTION", min_length=8)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    # Whitelist yazma ve FortiGate aksiyonu gibi durum değiştiren uçlar bu
+    # kullanıcı adı/şifre ile korunur (analyze/history gibi salt-okunur uçlar
+    # Faz 1 felsefesiyle uyumlu şekilde açık kalır).
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = Field(default="CHANGE_ME_IN_PRODUCTION", min_length=6)
 
     # --- CORS ---
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []

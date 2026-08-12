@@ -2,19 +2,20 @@
 
 FortiGate'e gerçekten istek gitmesi için hem burası çağrılmalı HEM DE
 `FORTIGATE_AUTO_BLOCK_ENABLED=true` olmalı — varsayılan (false) durumda
-bu uç nokta hep "engellenmedi" cevabı döner.
+bu uç nokta hep "engellenmedi" cevabı döner. Admin girişi gerektirir.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.schemas.actions import BlockIPRequest, BlockIPResponse
+from app.services.auth import require_auth
 from app.services.fortigate_service import FortiGateService
 
 router = APIRouter(prefix="/actions", tags=["Actions"])
 
 
 @router.post("/block-ip", response_model=BlockIPResponse)
-async def block_ip(request: BlockIPRequest) -> BlockIPResponse:
+async def block_ip(request: BlockIPRequest, _admin: str = Depends(require_auth)) -> BlockIPResponse:
     """Analistin manuel onayıyla bir IP'yi FortiGate'te engellemeyi dener."""
     service = FortiGateService()
     blocked = await service.block_ip(request.ip_address)

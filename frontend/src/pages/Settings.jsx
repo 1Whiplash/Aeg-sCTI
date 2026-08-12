@@ -1,7 +1,9 @@
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AdminLoginGate } from "@/components/ui/AdminLoginGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { api } from "@/lib/api";
+import { isAuthenticated } from "@/lib/auth";
 
 const IOC_TYPES = [
   { value: "ip", label: "IP" },
@@ -16,6 +18,7 @@ export default function Settings() {
   const [error, setError] = useState(null);
   const [form, setForm] = useState({ value: "", ioc_type: "ip", reason: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [authed, setAuthed] = useState(isAuthenticated());
 
   function loadEntries() {
     setLoading(true);
@@ -45,6 +48,7 @@ export default function Settings() {
       loadEntries();
     } catch (err) {
       setError(err.message);
+      if (err.message?.includes("giriş")) setAuthed(false);
     } finally {
       setSubmitting(false);
     }
@@ -54,8 +58,9 @@ export default function Settings() {
     try {
       await api.deleteWhitelistEntry(id);
       setEntries((prev) => prev.filter((entry) => entry.id !== id));
-    } catch {
+    } catch (err) {
       setError("Kayıt silinemedi.");
+      if (err.message?.includes("giriş")) setAuthed(false);
     }
   }
 
@@ -74,47 +79,50 @@ export default function Settings() {
           <CardTitle>Whitelist'e Ekle</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground">Değer</label>
-              <input
-                value={form.value}
-                onChange={(e) => setForm({ ...form, value: e.target.value })}
-                placeholder="örn. 8.8.8.8"
-                className="w-56 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground">Tip</label>
-              <select
-                value={form.ioc_type}
-                onChange={(e) => setForm({ ...form, ioc_type: e.target.value })}
-                className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          {!authed && <AdminLoginGate onSuccess={() => setAuthed(true)} />}
+          {authed && (
+            <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">Değer</label>
+                <input
+                  value={form.value}
+                  onChange={(e) => setForm({ ...form, value: e.target.value })}
+                  placeholder="örn. 8.8.8.8"
+                  className="w-56 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">Tip</label>
+                <select
+                  value={form.ioc_type}
+                  onChange={(e) => setForm({ ...form, ioc_type: e.target.value })}
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {IOC_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">Neden (opsiyonel)</label>
+                <input
+                  value={form.reason}
+                  onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                  placeholder="örn. Google DNS"
+                  className="w-56 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
               >
-                {IOC_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground">Neden (opsiyonel)</label>
-              <input
-                value={form.reason}
-                onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                placeholder="örn. Google DNS"
-                className="w-56 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              {submitting ? "Ekleniyor..." : "Ekle"}
-            </button>
-          </form>
+                {submitting ? "Ekleniyor..." : "Ekle"}
+              </button>
+            </form>
+          )}
           {error && <p className="mt-2 text-sm text-critical">{error}</p>}
         </CardContent>
       </Card>
@@ -137,7 +145,7 @@ export default function Settings() {
                     <th className="py-2 pr-4 font-medium">Tip</th>
                     <th className="py-2 pr-4 font-medium">Neden</th>
                     <th className="py-2 pr-4 font-medium">Eklenme</th>
-                    <th className="py-2 font-medium" />
+                    {authed && <th className="py-2 font-medium" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -151,16 +159,18 @@ export default function Settings() {
                       <td className="py-2 pr-4 text-muted-foreground">
                         {new Date(entry.created_at).toLocaleDateString("tr-TR")}
                       </td>
-                      <td className="py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(entry.id)}
-                          className="text-muted-foreground hover:text-critical"
-                          aria-label="Sil"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
+                      {authed && (
+                        <td className="py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(entry.id)}
+                            className="text-muted-foreground hover:text-critical"
+                            aria-label="Sil"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

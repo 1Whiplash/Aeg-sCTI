@@ -1,12 +1,14 @@
 import { Bot, CheckCircle2, FileDown, MapPin, ShieldBan } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { AdminLoginGate } from "@/components/ui/AdminLoginGate";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { RiskGauge } from "@/components/ui/RiskGauge";
 import { Tabs } from "@/components/ui/Tabs";
 import { ThreatMap } from "@/components/ui/ThreatMap";
 import { api } from "@/lib/api";
+import { isAuthenticated } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { exportAnalysisPdf } from "@/lib/pdfExport";
 
@@ -33,6 +35,7 @@ export default function Investigate() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [blockState, setBlockState] = useState(null); // null | "loading" | { blocked, message }
+  const [authed, setAuthed] = useState(isAuthenticated());
 
   useEffect(() => {
     if (!value || !iocType) return;
@@ -93,7 +96,7 @@ export default function Investigate() {
               PDF İndir
             </button>
 
-            {iocType === "ip" && (
+            {iocType === "ip" && authed && (
               <button
                 type="button"
                 onClick={handleBlockIp}
@@ -104,6 +107,7 @@ export default function Investigate() {
                 {blockState === "loading" ? "Gönderiliyor..." : "FortiGate'e Kural Bas"}
               </button>
             )}
+            {iocType === "ip" && !authed && <AdminLoginGate onSuccess={() => setAuthed(true)} />}
           </div>
 
           {blockState && blockState !== "loading" && (
