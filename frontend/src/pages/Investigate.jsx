@@ -1,10 +1,11 @@
-import { Bot, CheckCircle2, FileDown, ShieldBan } from "lucide-react";
+import { Bot, CheckCircle2, FileDown, MapPin, ShieldBan } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { RiskGauge } from "@/components/ui/RiskGauge";
 import { Tabs } from "@/components/ui/Tabs";
+import { ThreatMap } from "@/components/ui/ThreatMap";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { exportAnalysisPdf } from "@/lib/pdfExport";
@@ -152,6 +153,30 @@ export default function Investigate() {
               </CardContent>
             </Card>
           </div>
+
+          {result.geo && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <CardTitle>Coğrafi Konum</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ThreatMap
+                  lat={result.geo.lat}
+                  lon={result.geo.lon}
+                  severity={result.severity}
+                  label={[result.geo.city, result.geo.country].filter(Boolean).join(", ")}
+                />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {[result.geo.city, result.geo.country].filter(Boolean).join(", ") || "Bilinmiyor"}
+                  {" · "}
+                  {result.geo.lat.toFixed(2)}, {result.geo.lon.toFixed(2)}
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
