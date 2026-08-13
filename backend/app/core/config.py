@@ -104,6 +104,16 @@ class Settings(BaseSettings):
     # Bu bayrak açık olmadan fortigate_service hiçbir isteği dışarı göndermez.
     FORTIGATE_AUTO_BLOCK_ENABLED: bool = False
 
+    # --- SIEM Dışa Aktarım (Syslog/CEF, Faz 1: Pasif/Standby) ---
+    # FortiGate ile aynı felsefe: bu bayrak açık olmadan siem_service hiçbir
+    # soket bağlantısı kurmaz.
+    SIEM_EXPORT_ENABLED: bool = False
+    SIEM_HOST: str | None = None
+    SIEM_PORT: int = 514
+    SIEM_PROTOCOL: Literal["udp", "tcp"] = "udp"
+    # Bu eşiğin altındaki (düşük/orta risk) sonuçlar SIEM'e gönderilmez.
+    SIEM_ALERT_THRESHOLD: int = 50
+
     # --- Loglama ---
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 

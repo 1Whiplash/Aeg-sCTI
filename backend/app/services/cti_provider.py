@@ -6,6 +6,7 @@ kalıcı olarak kaydeder. Aynı IOC kısa süre içinde tekrar sorgulanırsa
 sonuç Redis önbelleğinden dönülür, zincir yeniden çalıştırılmaz.
 """
 
+import asyncio
 import logging
 
 from fastapi import Depends
@@ -21,6 +22,7 @@ from app.services.geo import extract_geo
 from app.services.interfaces import ICTIProvider
 from app.services.ollama_service import OllamaAnalysisService
 from app.services.risk_engine import RiskEngine
+from app.services.siem_service import export_to_siem
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +67,12 @@ class AggregatedCTIProvider(ICTIProvider):
 
         await self._persist(response)
         await self._cache.set(request.ioc_type.value, request.value, response.model_dump(mode="json"))
+
+        # Fire-and-forget: SIEM'e gönderim /analyze yanıt süresini asla
+        # etkilememeli (export_to_siem içten kendi zaman aşımını ve hata
+        # yutmasını yönetir, ayrıca SIEM_EXPORT_ENABLED=false iken anında döner).
+        asyncio.create_task(export_to_siem(response))
+
         return response
 
     async def _persist(self, response: IOCAnalysisResponse) -> None:

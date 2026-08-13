@@ -26,10 +26,26 @@ müdahale (SOAR aksiyonları) bilinçli olarak devre dışı/pasif bırakılmı�
   ülke koduna göre yaklaşık merkez).
 - **Whitelist yönetimi, sorgu geçmişi, otomatik uyarı listesi** (risk ≥ 50),
   Dashboard'da canlı istatistikler ve çoklu-nokta harita.
+- **Kaynak bazlı doğrulama görünümü**: VirusTotal'ın hangi motorun (Kaspersky,
+  Fortinet, ESET vb.) zararlı/şüpheli işaretlediğini isimleriyle gösterir —
+  toplu sayı yerine somut doğrulama; AbuseIPDB rapor kategorileri de eklenir.
+- **Açığa çıkan riskli servisler**: Shodan port verisinden RDP/SMB/PostgreSQL/
+  MySQL/MongoDB/Redis gibi yaygın istismar edilen servisleri ayrı, risk
+  skorunu ETKİLEMEYEN bir alanda gösterir (skor sadece bilinen kötüye
+  kullanım kanıtına dayanır, açık port başlı başına kanıt sayılmaz).
+- **İzleme Listesi (Bookmark)**: göstergeleri isimlendirerek kaydetme;
+  "Kontrol Et" ile önbelleği atlayan taze bir analiz çalıştırıp bir önceki
+  kontrolden bu yana risk skoru/severity/açık servis değişimini DETERMİNİSTİK
+  (LLM'e dayanmayan) bir özet olarak gösterir.
 - **PDF rapor dışa aktarma**: kurumsal görünümlü, özetlenmiş OSINT
   bulgularıyla tek tıkla indirilebilir rapor.
 - **Pasif FortiGate SOAR istemcisi**: `FORTIGATE_AUTO_BLOCK_ENABLED=false`
   olduğu sürece hiçbir gerçek isteği dışarı göndermez.
+- **Pasif SIEM dışa aktarımı (Syslog/CEF)**: `SIEM_EXPORT_ENABLED=false`
+  olduğu sürece devre dışı; açıldığında risk skoru eşiği (`SIEM_ALERT_THRESHOLD`,
+  varsayılan 50) aşan sonuçları CEF formatında syslog'a gönderir (QRadar,
+  ArcSight, Splunk, Elastic dahil çoğu SIEM'le uyumlu) — gönderim arka planda
+  çalışır, SIEM erişilemez olsa bile `/analyze` yanıt süresini etkilemez.
 - **Güvenlik**: JWT tabanlı admin girişi (whitelist yazma + FortiGate
   aksiyonu korumalı), Redis tabanlı rate limiting (analyze/login/block-ip),
   SSRF koruması (web scraper özel/iç ağ adreslerine istek atmaz), girdi
@@ -41,28 +57,31 @@ müdahale (SOAR aksiyonları) bilinçli olarak devre dışı/pasif bırakılmı�
 AegisCTI/
 ├── backend/                     # FastAPI (async, SOLID katmanlı mimari)
 │   └── app/
-│       ├── api/v1/              # auth, health, ioc, history, actions, whitelist
+│       ├── api/v1/              # auth, health, ioc, history, actions, whitelist, bookmarks
 │       ├── core/                # config.py, enums.py, logging_config.py
 │       ├── db/                  # SQLAlchemy engine/session
-│       ├── models/               # search_history, whitelist (ORM)
+│       ├── models/               # search_history, whitelist, bookmark (ORM)
 │       ├── schemas/              # Pydantic şemaları
 │       └── services/             # İş mantığı + OSINT collector'lar + arayüzler
 │           ├── virustotal.py / abuseipdb.py / shodan.py / otx.py / web_scraper.py
 │           ├── aggregator.py     # collector'ları paralel çalıştırır
 │           ├── risk_engine.py    # ağırlıklı skor formülü
+│           ├── exposure.py       # Shodan port -> riskli servis çıkarımı
+│           ├── diff.py           # bookmark 'yeniden kontrol' deterministik karşılaştırma
 │           ├── ollama_service.py # LLM analizi (dil/kalibrasyon güvencesi)
 │           ├── geo.py            # coğrafi konum çıkarımı
 │           ├── cache.py          # Redis önbellek
 │           ├── rate_limiter.py   # Redis tabanlı rate limiting
 │           ├── auth.py           # JWT admin girişi
-│           └── fortigate_service.py  # pasif SOAR istemcisi
+│           ├── fortigate_service.py  # pasif SOAR istemcisi
+│           └── siem_service.py   # pasif SIEM (Syslog/CEF) dışa aktarım istemcisi
 │   └── alembic/                 # DB migration'ları
 ├── frontend/                     # React + Vite + TailwindCSS (Obsidian Dark tema)
 │   └── src/
-│       ├── components/ui/        # RiskGauge, ThreatMap, Tabs, AdminLoginGate...
+│       ├── components/ui/        # RiskGauge, ThreatMap, Tabs, VendorVerdicts, AdminLoginGate...
 │       ├── components/layout/    # Header (global arama), Sidebar
 │       ├── lib/                  # api.js, auth.js, detectIocType.js, pdfExport.js
-│       └── pages/                # Dashboard, Investigate, Alerts, Activity, Settings
+│       └── pages/                # Dashboard, Investigate, Alerts, Activity, Bookmarks, Settings
 └── docker-compose.yml             # backend, frontend, postgres, redis, ollama
 ```
 
@@ -127,6 +146,9 @@ $env:DOCKER_BUILDKIT="0"; $env:COMPOSE_BAKE="false"; docker compose up -d --buil
 | `DELETE /api/v1/whitelist/{id}` | Whitelist'ten sil | Admin girişi ister |
 | `POST /api/v1/actions/block-ip` | FortiGate engelleme (pasif) | Admin + rate limit (5/dk) |
 | `POST /api/v1/auth/login` | Admin girişi, JWT döner | Rate limit (5/dk, brute-force koruması) |
+| `GET/POST /api/v1/bookmarks` | İzleme listesi listele/ekle | POST admin girişi ister |
+| `DELETE /api/v1/bookmarks/{id}` | İzleme listesinden sil | Admin girişi ister |
+| `POST /api/v1/bookmarks/{id}/recheck` | Önbelleği atlayıp taze analiz + deterministik diff | Rate limit (`/analyze` ile aynı kova, 10/dk) |
 
 ## Bilinen Sınırlamalar / Faz 2 Adayları
 
