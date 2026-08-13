@@ -35,8 +35,10 @@ class AggregatedCTIProvider(ICTIProvider):
         self._risk_engine = RiskEngine()
         self._cache = AnalysisCache()
 
-    async def lookup(self, request: IOCAnalysisRequest) -> IOCAnalysisResponse:
-        cached = await self._cache.get(request.ioc_type.value, request.value)
+    async def lookup(
+        self, request: IOCAnalysisRequest, force_refresh: bool = False
+    ) -> IOCAnalysisResponse:
+        cached = None if force_refresh else await self._cache.get(request.ioc_type.value, request.value)
         if cached is not None:
             logger.info("Önbellekten dönülüyor: %s (%s)", request.value, request.ioc_type)
             return IOCAnalysisResponse.model_validate(cached)

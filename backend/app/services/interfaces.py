@@ -18,8 +18,14 @@ class ICTIProvider(ABC):
     """Dış tehdit istihbaratı kaynaklarına erişim için soyut arayüz."""
 
     @abstractmethod
-    async def lookup(self, request: IOCAnalysisRequest) -> IOCAnalysisResponse:
-        """Bir IOC'yi sorgular ve normalize edilmiş bir sonuç döner."""
+    async def lookup(
+        self, request: IOCAnalysisRequest, force_refresh: bool = False
+    ) -> IOCAnalysisResponse:
+        """Bir IOC'yi sorgular ve normalize edilmiş bir sonuç döner.
+
+        `force_refresh=True` ise önbellek atlanır (bookmark 'yeniden kontrol'
+        akışında kullanılır — amaç gerçekten güncel veriyle karşılaştırmaktır).
+        """
         raise NotImplementedError
 
 
