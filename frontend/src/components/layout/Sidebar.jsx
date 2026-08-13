@@ -1,4 +1,4 @@
-import { Activity, LayoutDashboard, Search, Settings, ShieldAlert } from "lucide-react";
+import { Activity, Bookmark, LayoutDashboard, Search, Settings, ShieldAlert } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: "/investigate", label: "IOC İncele", icon: Search },
   { to: "/alerts", label: "Uyarılar", icon: ShieldAlert },
   { to: "/activity", label: "Aktivite", icon: Activity },
+  { to: "/bookmarks", label: "İzleme Listesi", icon: Bookmark },
   { to: "/settings", label: "Ayarlar", icon: Settings },
 ];
 

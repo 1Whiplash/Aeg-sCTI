@@ -58,4 +58,13 @@ export const api = {
     if (minRiskScore !== null) params.set("min_risk_score", minRiskScore);
     return request(`/history?${params.toString()}`);
   },
+  listBookmarks: () => request("/bookmarks"),
+  addBookmark: (payload) =>
+    request("/bookmarks", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    }),
+  deleteBookmark: (id) => request(`/bookmarks/${id}`, { method: "DELETE", headers: authHeaders() }),
+  recheckBookmark: (id) => request(`/bookmarks/${id}/recheck`, { method: "POST" }),
 };

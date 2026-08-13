@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import Activity from "@/pages/Activity";
 import Alerts from "@/pages/Alerts";
+import Bookmarks from "@/pages/Bookmarks";
 import Dashboard from "@/pages/Dashboard";
 import Investigate from "@/pages/Investigate";
 import Settings from "@/pages/Settings";
@@ -23,6 +24,7 @@ export default function App() {
               <Route path="/investigate" element={<Investigate />} />
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/activity" element={<Activity />} />
+              <Route path="/bookmarks" element={<Bookmarks />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </main>
