@@ -1,0 +1,100 @@
+"""İzleme listesindeki göstergeleri zamanlanmış olarak yeniden kontrol eder.
+
+`BOOKMARK_AUTO_CHECK_ENABLED=False` (varsayılan) iken main.py bu
+scheduler'ı hiç başlatmaz. Çalıştığında TÜM bookmark'ları sırayla (paralel
+değil — Ollama zaten tek seferde bir çıkarım işliyor, bkz. README'deki
+performans notu) yeniden analiz eder, deterministik diff hesaplar ve
+ANLAMLI değişiklik varsa (bkz. email_service.is_meaningful_change) tek bir
+özet e-postada raporlar.
+"""
+
+import asyncio
+import logging
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from sqlalchemy import select
+
+from app.core.config import settings
+from app.db.session import AsyncSessionLocal
+from app.models.bookmark import Bookmark
+from app.services.bookmark_recheck import recheck_bookmark_and_diff
+from app.services.cti_provider import AggregatedCTIProvider
+from app.services.email_service import BookmarkChangeReport, is_meaningful_change, send_bookmark_report
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_check_times(raw: str) -> list[tuple[int, int]]:
+    """"08:00,17:00" -> [(8, 0), (17, 0)]. Geçersiz girdiler atlanır (loglanır)."""
+    times: list[tuple[int, int]] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            hour_str, minute_str = part.split(":")
+            times.append((int(hour_str), int(minute_str)))
+        except ValueError:
+            logger.warning("BOOKMARK_CHECK_TIMES içinde geçersiz saat atlandı: %r", part)
+    return times
+
+
+async def run_bookmark_check_job() -> None:
+    """Tüm bookmark'ları yeniden kontrol edip anlamlı değişiklikleri e-postayla raporlar."""
+    logger.info("Zamanlanmış izleme listesi kontrolü başlıyor.")
+    async with AsyncSessionLocal() as db:
+        bookmarks = (await db.execute(select(Bookmark))).scalars().all()
+        if not bookmarks:
+            logger.info("İzleme listesinde gösterge yok, kontrol atlandı.")
+            return
+
+        provider = AggregatedCTIProvider(db)
+        reports: list[BookmarkChangeReport] = []
+        for bookmark in bookmarks:
+            try:
+                analysis, diff = await recheck_bookmark_and_diff(db, bookmark, provider)
+            except Exception as exc:  # noqa: BLE001 — bir gösterge başarısız olsa da diğerleri devam etmeli
+                logger.error("Zamanlanmış kontrol başarısız (%s): %s", bookmark.value, exc)
+                continue
+            if is_meaningful_change(diff):
+                reports.append(
+                    BookmarkChangeReport(
+                        display_name=bookmark.display_name,
+                        value=bookmark.value,
+                        ioc_type=bookmark.ioc_type.value,
+                        analysis=analysis,
+                        diff=diff,
+                    )
+                )
+
+        logger.info(
+            "İzleme listesi kontrolü bitti: %d gösterge kontrol edildi, %d anlamlı değişiklik.",
+            len(bookmarks),
+            len(reports),
+        )
+        # smtplib bloklayan bir kütüphane — event loop'u kilitlememesi için ayrı thread'de çalıştır.
+        await asyncio.to_thread(send_bookmark_report, reports, len(bookmarks))
+
+
+def create_scheduler() -> AsyncIOScheduler | None:
+    """`BOOKMARK_AUTO_CHECK_ENABLED=False` ise None döner (hiçbir job kurulmaz)."""
+    if not settings.BOOKMARK_AUTO_CHECK_ENABLED:
+        logger.info("Bookmark otomatik kontrolü devre dışı (BOOKMARK_AUTO_CHECK_ENABLED=false).")
+        return None
+
+    check_times = _parse_check_times(settings.BOOKMARK_CHECK_TIMES)
+    if not check_times:
+        logger.warning("BOOKMARK_CHECK_TIMES içinde geçerli saat yok, scheduler kurulmadı.")
+        return None
+
+    scheduler = AsyncIOScheduler()
+    for hour, minute in check_times:
+        scheduler.add_job(
+            run_bookmark_check_job,
+            trigger=CronTrigger(hour=hour, minute=minute),
+            id=f"bookmark-check-{hour:02d}{minute:02d}",
+            replace_existing=True,
+        )
+    logger.info("Bookmark otomatik kontrolü kuruldu: %s", settings.BOOKMARK_CHECK_TIMES)
+    return scheduler

@@ -124,6 +124,26 @@ class Settings(BaseSettings):
     # Bu eşiğin altındaki (düşük/orta risk) sonuçlar SIEM'e gönderilmez.
     SIEM_ALERT_THRESHOLD: int = 50
 
+    # --- Bookmark Otomatik Kontrol (Faz 1: Pasif/Standby) ---
+    # Açık olmadan hiçbir zamanlanmış görev kurulmaz.
+    BOOKMARK_AUTO_CHECK_ENABLED: bool = False
+    # Sunucu saatine göre HH:MM, virgülle ayrılmış (örn. "08:00,17:00").
+    BOOKMARK_CHECK_TIMES: str = "08:00,17:00"
+    # Bu eşiğin altındaki risk skoru değişimleri "gürültü" sayılıp e-postada
+    # raporlanmaz — LLM'in temperature=0 ile bile küçük bir varyansı olabilir,
+    # amaç sadece gerçekten dikkat gerektiren değişimi bildirmek.
+    BOOKMARK_ALERT_MIN_SCORE_DELTA: int = 15
+
+    # --- E-posta Bildirimi (Faz 1: Pasif/Standby) ---
+    EMAIL_ALERTS_ENABLED: bool = False
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None  # Gmail: Hesap ayarları > Uygulama Şifreleri
+    SMTP_FROM_ADDRESS: str | None = None
+    # Virgülle ayrılmış analist e-posta adresleri (örn. "ali@kurum.com,ayse@kurum.com").
+    ANALYST_EMAILS: str | None = None
+
     # --- Loglama ---
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 

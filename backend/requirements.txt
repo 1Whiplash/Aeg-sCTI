@@ -12,6 +12,7 @@ tenacity==9.0.0
 beautifulsoup4==4.12.3
 python-whois==0.9.4
 pyjwt==2.9.0
+apscheduler==3.10.4
 
 # --- Test ---
 pytest==8.3.3

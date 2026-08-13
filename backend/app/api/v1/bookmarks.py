@@ -13,12 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 from app.models.bookmark import Bookmark
-from app.models.search_history import SearchHistory
-from app.schemas.bookmark import BookmarkCreate, BookmarkDiff, BookmarkItem, BookmarkRecheckResponse
-from app.schemas.ioc import IOCAnalysisRequest, OSINTEvidence
+from app.schemas.bookmark import BookmarkCreate, BookmarkItem, BookmarkRecheckResponse
 from app.services.auth import require_auth
+from app.services.bookmark_recheck import recheck_bookmark_and_diff
 from app.services.cti_provider import get_cti_provider
-from app.services.diff import HistorySnapshot, compute_diff
 from app.services.interfaces import ICTIProvider
 from app.services.rate_limiter import RateLimiter
 
@@ -85,38 +83,5 @@ async def recheck_bookmark(
     if bookmark is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bookmark bulunamadı.")
 
-    previous_row = (
-        await db.execute(
-            select(SearchHistory)
-            .where(SearchHistory.ioc_value == bookmark.value, SearchHistory.ioc_type == bookmark.ioc_type)
-            .order_by(SearchHistory.created_at.desc())
-            .limit(1)
-        )
-    ).scalar_one_or_none()
-
-    analysis = await provider.lookup(
-        IOCAnalysisRequest(value=bookmark.value, ioc_type=bookmark.ioc_type), force_refresh=True
-    )
-
-    previous_snapshot = None
-    if previous_row is not None:
-        previous_evidence = [
-            OSINTEvidence.model_validate(item)
-            for item in (previous_row.osint_raw or {}).get("evidence", [])
-        ]
-        previous_snapshot = HistorySnapshot(
-            risk_score=previous_row.risk_score,
-            severity=previous_row.severity,
-            osint_evidence=previous_evidence,
-            created_at=previous_row.created_at,
-        )
-
-    current_snapshot = HistorySnapshot(
-        risk_score=analysis.risk_score,
-        severity=analysis.severity,
-        osint_evidence=analysis.osint_evidence,
-        created_at=analysis.analyzed_at,
-    )
-
-    diff: BookmarkDiff = compute_diff(current_snapshot, previous_snapshot)
+    analysis, diff = await recheck_bookmark_and_diff(db, bookmark, provider)
     return BookmarkRecheckResponse(analysis=analysis, diff=diff)

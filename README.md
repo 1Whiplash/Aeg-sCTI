@@ -33,6 +33,15 @@ müdahale (SOAR aksiyonları) bilinçli olarak devre dışı/pasif bırakılmı�
   MySQL/MongoDB/Redis gibi yaygın istismar edilen servisleri ayrı, risk
   skorunu ETKİLEMEYEN bir alanda gösterir (skor sadece bilinen kötüye
   kullanım kanıtına dayanır, açık port başlı başına kanıt sayılmaz).
+- **İzleme Listesi otomatik kontrolü + e-posta raporu (Faz 1: Pasif/Standby)**:
+  `BOOKMARK_AUTO_CHECK_ENABLED=false` olduğu sürece hiçbir zamanlanmış görev
+  kurulmaz. Açıldığında günde birden çok kez (`BOOKMARK_CHECK_TIMES`, örn.
+  "08:00,17:00") tüm izlenen göstergeleri sırayla yeniden analiz eder;
+  sadece ANLAMLI bir değişiklik varsa (önem derecesi geçişi, risk skoru
+  `BOOKMARK_ALERT_MIN_SCORE_DELTA` eşiğini aşan farkı, yeni/kaybolan açık
+  servis) `ANALYST_EMAILS`'e (virgülle ayrılmış) Gmail/SMTP üzerinden tek
+  bir özet raporu gönderir — rapor metni de LLM'e değil, deterministik
+  `diff.py` çıktısına dayanır.
 - **İzleme Listesi (Bookmark)**: göstergeleri isimlendirerek kaydetme;
   "Kontrol Et" ile önbelleği atlayan taze bir analiz çalıştırıp bir önceki
   kontrolden bu yana risk skoru/severity/açık servis değişimini DETERMİNİSTİK
