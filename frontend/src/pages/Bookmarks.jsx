@@ -14,6 +14,13 @@ const IOC_TYPES = [
   { value: "hash", label: "Hash" },
 ];
 
+const VALUE_PLACEHOLDER = {
+  ip: "örn. 1.2.3.4",
+  domain: "örn. example.com",
+  url: "örn. https://example.com/yol",
+  hash: "örn. 275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0",
+};
+
 const SEVERITY_LABEL = { critical: "Kritik", high: "Yüksek", medium: "Orta", low: "Düşük" };
 
 function DiffPanel({ diff, analysis }) {
@@ -173,8 +180,8 @@ export default function Bookmarks() {
                 <input
                   value={form.value}
                   onChange={(e) => setForm({ ...form, value: e.target.value })}
-                  placeholder="örn. 1.2.3.4"
-                  className="w-56 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder={VALUE_PLACEHOLDER[form.ioc_type]}
+                  className="w-56 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono text-xs"
                 />
               </div>
               <div className="flex flex-col gap-1">
