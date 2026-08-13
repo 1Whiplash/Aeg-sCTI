@@ -39,8 +39,17 @@ müdahale (SOAR aksiyonları) bilinçli olarak devre dışı/pasif bırakılmı�
   (LLM'e dayanmayan) bir özet olarak gösterir.
 - **PDF rapor dışa aktarma**: kurumsal görünümlü, özetlenmiş OSINT
   bulgularıyla tek tıkla indirilebilir rapor.
-- **Pasif FortiGate SOAR istemcisi**: `FORTIGATE_AUTO_BLOCK_ENABLED=false`
-  olduğu sürece hiçbir gerçek isteği dışarı göndermez.
+- **FortiGate SOAR entegrasyonu (Faz 1: Pasif/Standby)**: `FORTIGATE_AUTO_BLOCK_ENABLED=false`
+  olduğu sürece hiçbir gerçek isteği dışarı göndermez. Açıldığında gerçekten
+  trafiği keser: hedef IP için bir adres nesnesi oluşturur, tek bir
+  blocklist adres grubuna ekler ve bu grubu kaynak/hedef olarak kullanan
+  iki yönlü (gelen + giden) `deny` politikasını idempotent şekilde garanti
+  eder — politikalar sadece ilk blokta oluşturulur, sonraki her blok sadece
+  gruba yeni üye ekler. **`FORTIGATE_BLOCK_INTERFACE` cihazınızın gerçek
+  arayüz adına göre ayarlanmalı ve gerçek/üretim cihazında etkinleştirmeden
+  önce bir test/lab FortiGate'te doğrulanmalı** — bu kod hiçbir gerçek
+  FortiGate donanımına karşı test edilmedi, sadece istek mantığı (doğru
+  sırada, idempotent) mock'lu testlerle doğrulandı.
 - **Pasif SIEM dışa aktarımı (Syslog/CEF)**: `SIEM_EXPORT_ENABLED=false`
   olduğu sürece devre dışı; açıldığında risk skoru eşiği (`SIEM_ALERT_THRESHOLD`,
   varsayılan 50) aşan sonuçları CEF formatında syslog'a gönderir (QRadar,
@@ -144,7 +153,7 @@ $env:DOCKER_BUILDKIT="0"; $env:COMPOSE_BAKE="false"; docker compose up -d --buil
 | `GET /api/v1/history` | Geçmiş sorgular (`min_risk_score` filtresi destekler) | Açık |
 | `GET/POST /api/v1/whitelist` | Whitelist listele/ekle | POST admin girişi ister |
 | `DELETE /api/v1/whitelist/{id}` | Whitelist'ten sil | Admin girişi ister |
-| `POST /api/v1/actions/block-ip` | FortiGate engelleme (pasif) | Admin + rate limit (5/dk) |
+| `POST /api/v1/actions/block-ip` | FortiGate engelleme (adres+grup+2 policy, `FORTIGATE_AUTO_BLOCK_ENABLED` şart) | Admin + rate limit (5/dk) |
 | `POST /api/v1/auth/login` | Admin girişi, JWT döner | Rate limit (5/dk, brute-force koruması) |
 | `GET/POST /api/v1/bookmarks` | İzleme listesi listele/ekle | POST admin girişi ister |
 | `DELETE /api/v1/bookmarks/{id}` | İzleme listesinden sil | Admin girişi ister |

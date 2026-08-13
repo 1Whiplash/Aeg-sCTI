@@ -103,6 +103,16 @@ class Settings(BaseSettings):
     FORTIGATE_VERIFY_SSL: bool = True
     # Bu bayrak açık olmadan fortigate_service hiçbir isteği dışarı göndermez.
     FORTIGATE_AUTO_BLOCK_ENABLED: bool = False
+    # ÖNEMLİ: Bu üçü FortiGate'inizin gerçek arayüz/topoloji adlarına göre
+    # AYARLANMALI — varsayılan "any" birçok kurulumda çalışır ama sizin
+    # cihazınızda geçerli bir arayüz adı olmayabilir (örn. "wan1", "port1").
+    # Yanlış arayüz adıyla policy oluşturma isteği FortiGate tarafından
+    # reddedilir (istemeden yanlış bir yeri bloklamaz), ama önce bir test/lab
+    # cihazında denemeniz şiddetle önerilir.
+    FORTIGATE_BLOCK_INTERFACE: str = "any"
+    FORTIGATE_ADDRESS_GROUP_NAME: str = "AegisCTI-Blocklist"
+    FORTIGATE_POLICY_INBOUND_NAME: str = "AegisCTI-Block-Inbound"
+    FORTIGATE_POLICY_OUTBOUND_NAME: str = "AegisCTI-Block-Outbound"
 
     # --- SIEM Dışa Aktarım (Syslog/CEF, Faz 1: Pasif/Standby) ---
     # FortiGate ile aynı felsefe: bu bayrak açık olmadan siem_service hiçbir

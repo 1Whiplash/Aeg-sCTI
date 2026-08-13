@@ -52,6 +52,13 @@ export default function Investigate() {
   }, [value, iocType]);
 
   async function handleBlockIp() {
+    if (
+      !window.confirm(
+        `"${value}" adresi FortiGate'te GERÇEKTEN engellenecek (blocklist grubuna eklenip iki yönlü deny policy uygulanacak). Emin misiniz?`,
+      )
+    ) {
+      return;
+    }
     setBlockState("loading");
     try {
       const response = await api.blockIp(value);

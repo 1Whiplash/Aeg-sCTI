@@ -30,12 +30,18 @@ async def block_ip(
     blocked = await service.block_ip(request.ip_address)
 
     if blocked:
-        return BlockIPResponse(blocked=True, message=f"{request.ip_address} FortiGate'te engellendi.")
+        return BlockIPResponse(
+            blocked=True,
+            message=(
+                f"{request.ip_address} FortiGate'te engellendi — blocklist grubuna eklendi ve "
+                "iki yönlü (gelen/giden) deny policy aktif."
+            ),
+        )
 
     return BlockIPResponse(
         blocked=False,
         message=(
             "Engelleme gerçekleştirilmedi — FORTIGATE_AUTO_BLOCK_ENABLED devre dışı "
-            "veya FortiGate bağlantısı başarısız."
+            "veya FortiGate bağlantısı başarısız (sunucu loglarını kontrol edin)."
         ),
     )
