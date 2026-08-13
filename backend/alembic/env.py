@@ -16,7 +16,7 @@ from alembic import context
 
 from app.core.config import settings
 from app.db.base import Base
-from app.models import search_history, whitelist  # noqa: F401 — Base.metadata'ya kayıt için
+from app.models import bookmark, search_history, whitelist  # noqa: F401 — Base.metadata'ya kayıt için
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URI)
