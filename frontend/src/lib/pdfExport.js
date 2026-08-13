@@ -129,6 +129,21 @@ function summarizeEvidence(item) {
       const total = Object.values(stats).reduce((sum, v) => sum + (Number(v) || 0), 0);
       lines.push(`Motor tespiti: ${stats.malicious ?? 0}/${total} zararli, ${stats.suspicious ?? 0} supheli olarak isaretledi`);
     }
+    const results = attrs.last_analysis_results;
+    if (results) {
+      const maliciousNames = Object.entries(results)
+        .filter(([, v]) => v?.category === "malicious")
+        .map(([name]) => name);
+      const suspiciousNames = Object.entries(results)
+        .filter(([, v]) => v?.category === "suspicious")
+        .map(([name]) => name);
+      if (maliciousNames.length > 0) {
+        lines.push(`Zararli isaretleyen motorlar: ${maliciousNames.join(", ")}`);
+      }
+      if (suspiciousNames.length > 0) {
+        lines.push(`Supheli isaretleyen motorlar: ${suspiciousNames.join(", ")}`);
+      }
+    }
     if (Array.isArray(attrs.names) && attrs.names.length > 0) {
       lines.push(`Bilinen dosya/gosterge adlari: ${attrs.names.slice(0, 3).join(", ")}`);
     }
