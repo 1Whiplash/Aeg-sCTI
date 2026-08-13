@@ -1,9 +1,10 @@
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { api } from "@/lib/api";
+import { isAuthenticated } from "@/lib/auth";
 
 const SEVERITY_LABEL = {
   critical: "Kritik",
@@ -35,6 +36,7 @@ export default function Activity() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
+  const [authed, setAuthed] = useState(isAuthenticated());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -44,6 +46,18 @@ export default function Activity() {
       .catch(() => setError("Geçmiş yüklenemedi."))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleDelete(event, item) {
+    event.stopPropagation(); // satırın kendi tıklama (incele) davranışını tetiklemesin
+    if (!window.confirm(`"${item.ioc_value}" geçmişten kalıcı olarak silinsin mi?`)) return;
+    try {
+      await api.deleteHistoryEntry(item.id);
+      setItems((prev) => prev.filter((entry) => entry.id !== item.id));
+    } catch (err) {
+      setError(err.status === 401 ? "Oturum süresi doldu, tekrar giriş yapın." : "Kayıt silinemedi.");
+      if (err.status === 401) setAuthed(false);
+    }
+  }
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -125,6 +139,7 @@ export default function Activity() {
                     <th className="py-2 pr-4 font-medium">Risk Skoru</th>
                     <th className="py-2 pr-4 font-medium">Önem</th>
                     <th className="py-2 pr-4 font-medium">Tarih</th>
+                    {authed && <th className="py-2 pr-4 font-medium" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -145,6 +160,18 @@ export default function Activity() {
                       <td className="py-2 pr-4 text-muted-foreground">
                         {new Date(item.created_at).toLocaleString("tr-TR")}
                       </td>
+                      {authed && (
+                        <td className="py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={(event) => handleDelete(event, item)}
+                            className="text-muted-foreground hover:text-critical"
+                            aria-label="Sil"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
