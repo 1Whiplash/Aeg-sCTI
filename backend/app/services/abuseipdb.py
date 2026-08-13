@@ -26,7 +26,11 @@ class AbuseIPDBCollector(BaseCollector):
             return None
 
         headers = {"Key": settings.ABUSEIPDB_API_KEY, "Accept": "application/json"}
-        params = {"ipAddress": value, "maxAgeInDays": 90}
+        # verbose: aggregate skorun yanında bireysel rapor kategorilerini
+        # (örn. "Brute-Force", "DDoS Attack") de döndürür — motor/kaynak
+        # bazlı doğrulama görünümü için kullanılıyor (reporter kimliği
+        # AbuseIPDB tarafından anonimleştirildiği için o bilgi yok).
+        params = {"ipAddress": value, "maxAgeInDays": 90, "verbose": "true"}
 
         async with httpx.AsyncClient(base_url=_BASE_URL, timeout=_TIMEOUT, headers=headers) as client:
             try:
