@@ -17,7 +17,7 @@ class Bookmark(Base):
     __tablename__ = "bookmarks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    value: Mapped[str] = mapped_column(String(512), index=True, nullable=False)
+    value: Mapped[str] = mapped_column(String(512), unique=True, index=True, nullable=False)
     ioc_type: Mapped[IOCType] = mapped_column(
         SAEnum(IOCType, name="ioc_type_enum", values_callable=enum_values), nullable=False
     )
