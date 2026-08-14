@@ -18,7 +18,9 @@ göre ayarlanmalı (bkz. config.py). Bu kod bir test/lab FortiGate'e karşı
 doğrulanmadan üretim cihazında etkinleştirilmemeli.
 """
 
+import asyncio
 import logging
+from dataclasses import dataclass
 
 import httpx
 
@@ -27,6 +29,25 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 _TIMEOUT = 10.0
+
+# _ensure_in_blocklist_group GET'le mevcut üyeleri okuyup PUT'la tam listeyi
+# geri yazıyor (read-modify-write) — FortiOS API'sinde tekil üye ekleme/
+# compare-and-swap yok. Bu yüzden aynı süreç içinde çakışan iki block_ip()
+# çağrısı (örn. bir analist arka arkaya iki farklı IP'yi engellerse) birbirinin
+# PUT'unu sessizce ezip bir üyeyi blocklist'ten düşürebilir. Modül seviyesinde
+# tek bir lock, tüm block_ip() çağrılarını serileştirerek bunu engeller.
+_block_lock = asyncio.Lock()
+
+
+@dataclass
+class BlockResult:
+    """`block_ip()` sonucu. `partial=True`, policy adımından ÖNCEKİ adımların
+    (adres + blocklist grubu üyeliği) FortiGate'te canlıya geçmiş olabileceği,
+    ama iki yönlü deny policy'nin garanti edilemediği anlamına gelir — bu
+    durumda cihaz "hiçbir şey olmadı" değil, "kısmen engellendi" durumundadır."""
+
+    success: bool
+    partial: bool = False
 
 
 def _address_name(ip_address: str) -> str:
@@ -48,11 +69,11 @@ class FortiGateService:
             verify=settings.FORTIGATE_VERIFY_SSL,
         )
 
-    async def block_ip(self, ip_address: str, comment: str = "AegisCTI otomatik engelleme") -> bool:
+    async def block_ip(self, ip_address: str, comment: str = "AegisCTI otomatik engelleme") -> BlockResult:
         """IP'yi engeller: adres nesnesi + blocklist grubu + iki yönlü deny policy.
 
         `FORTIGATE_AUTO_BLOCK_ENABLED=False` (varsayılan) iken hiçbir ağ isteği
-        göndermez, sadece loglar ve `False` döner.
+        göndermez, sadece loglar ve `BlockResult(success=False)` döner.
         """
         if not settings.FORTIGATE_AUTO_BLOCK_ENABLED:
             logger.info(
@@ -60,20 +81,35 @@ class FortiGateService:
                 "%s için istek gönderilmedi.",
                 ip_address,
             )
-            return False
+            return BlockResult(success=False)
 
         if not self._base_url or not self._token:
             logger.error("FORTIGATE_HOST/FORTIGATE_API_KEY tanımlı değil, engelleme yapılamadı.")
-            return False
+            return BlockResult(success=False)
 
-        async with self._client() as client:
+        async with _block_lock, self._client() as client:
+            group_step_done = False
             try:
                 await self._ensure_address_object(client, ip_address, comment)
                 await self._ensure_in_blocklist_group(client, ip_address)
+                group_step_done = True
                 await self._ensure_block_policies(client)
-            except httpx.HTTPError as exc:
+            # KeyError/IndexError/TypeError: FortiGate 200 dönüp beklenmedik bir
+            # JSON şekli (örn. boş "results") verirse _ensure_in_blocklist_group'un
+            # sözlük/liste erişimleri patlar — bu bir httpx.HTTPError değildir ama
+            # aynı şekilde "istek başarısız" sayılıp False dönülmeli, ham exception
+            # olarak /actions/block-ip'den 500 sızdırılmamalı.
+            except (httpx.HTTPError, KeyError, IndexError, TypeError) as exc:
                 logger.error("FortiGate isteği başarısız (%s): %s", ip_address, exc)
-                return False
+                if group_step_done:
+                    logger.error(
+                        "FortiGate: %s zaten '%s' blocklist grubuna eklenmiş olabilir "
+                        "(policy adımı başarısız oldu) — cihazı MANUEL kontrol edin, "
+                        "kısmi engelleme durumu oluşmuş olabilir.",
+                        ip_address,
+                        settings.FORTIGATE_ADDRESS_GROUP_NAME,
+                    )
+                return BlockResult(success=False, partial=group_step_done)
 
         logger.warning(
             "FortiGate: %s adresi '%s' blocklist grubuna eklendi (policy: %s / %s).",
@@ -82,7 +118,7 @@ class FortiGateService:
             settings.FORTIGATE_POLICY_INBOUND_NAME,
             settings.FORTIGATE_POLICY_OUTBOUND_NAME,
         )
-        return True
+        return BlockResult(success=True)
 
     async def _ensure_address_object(self, client: httpx.AsyncClient, ip_address: str, comment: str) -> None:
         name = _address_name(ip_address)

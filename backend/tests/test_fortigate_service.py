@@ -7,11 +7,12 @@ idempotent şekilde istek attığını doğrular. FortiOS'un gerçek davranış�
 doğrulanmalı — bkz. README'deki uyarı notu.
 """
 
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import httpx
 
-from app.services.fortigate_service import FortiGateService, _address_name
+from app.services.fortigate_service import FortiGateService, _address_name, _block_lock
 
 
 def _resp(status_code: int, json_body: dict | None = None) -> httpx.Response:
@@ -53,7 +54,8 @@ class TestDisabledOrUnconfigured:
         service = FortiGateService()
         with patch.object(FortiGateService, "_client") as mock_client:
             result = await service.block_ip("1.2.3.4")
-        assert result is False
+        assert result.success is False
+        assert result.partial is False
         mock_client.assert_not_called()
 
     async def test_missing_host_sends_nothing(self):
@@ -66,7 +68,7 @@ class TestDisabledOrUnconfigured:
         ):
             with patch.object(FortiGateService, "_client") as mock_client:
                 result = await service.block_ip("1.2.3.4")
-        assert result is False
+        assert result.success is False
         mock_client.assert_not_called()
 
 
@@ -92,7 +94,8 @@ class TestBlockIpEnabled:
             service = FortiGateService()
             result = await service.block_ip(ip)
 
-        assert result is True
+        assert result.success is True
+        assert result.partial is False
         # address + addrgrp + 2 policy = 4 POST
         assert post_mock.call_count == 4
         post_paths = [call.args[0] for call in post_mock.call_args_list]
@@ -124,7 +127,7 @@ class TestBlockIpEnabled:
             service = FortiGateService()
             result = await service.block_ip(ip)
 
-        assert result is True
+        assert result.success is True
         post_mock.assert_not_called()
 
     async def test_group_exists_but_ip_missing_appends_via_put(self):
@@ -148,7 +151,7 @@ class TestBlockIpEnabled:
             service = FortiGateService()
             result = await service.block_ip(ip)
 
-        assert result is True
+        assert result.success is True
         put_mock.assert_called_once()
         members = put_mock.call_args.kwargs["json"]["member"]
         assert {"name": "other-ip"} in members
@@ -173,4 +176,76 @@ class TestBlockIpEnabled:
             service = FortiGateService()
             result = await service.block_ip(ip)
 
-        assert result is False
+        assert result.success is False
+        # Hata grup adımından ÖNCE (adres GET'i başarılı ama grup GET'i 500) oluştu,
+        # grup üyeliği hiç garanti edilmedi -> kısmi durum yok.
+        assert result.partial is False
+
+    async def test_malformed_group_response_returns_false_without_raising(self):
+        """FortiGate 200 dönüp beklenmedik bir JSON şekli (örn. boş 'results')
+        verirse, ham IndexError/KeyError dışarı sızıp /block-ip'yi 500'e
+        düşürmemeli — httpx.HTTPError değil ama yine de 'başarısız' sayılmalı."""
+        ip = "1.2.3.4"
+        name = _address_name(ip)
+
+        async def fake_get(url, params=None, **kwargs):
+            if url.endswith(f"/firewall/address/{name}"):
+                return _resp(200)
+            if url.endswith("/firewall/addrgrp/AegisCTI-Blocklist"):
+                return _resp(200, {"results": []})  # beklenmeyen şekil: results boş
+            raise AssertionError(f"beklenmeyen GET: {url}")
+
+        get_mock = AsyncMock(side_effect=fake_get)
+        client = _FakeAsyncClient(get=get_mock)
+
+        with _enabled(), patch.object(FortiGateService, "_client", return_value=client):
+            service = FortiGateService()
+            result = await service.block_ip(ip)  # raise etmemeli
+
+        assert result.success is False
+        assert result.partial is False
+
+    async def test_policy_step_failure_after_group_success_is_reported_as_partial(self):
+        """Adres + grup üyeliği adımları BAŞARILI olduktan sonra policy adımı
+        patlarsa, FortiGate'te canlı bir durum değişikliği zaten olmuş olabilir
+        — bu 'hiçbir şey olmadı' değil, 'kısmi' olarak işaretlenmeli ki analist
+        cihazı manuel kontrol etme ihtiyacını anlasın."""
+        ip = "1.2.3.4"
+        name = _address_name(ip)
+
+        async def fake_get(url, params=None, **kwargs):
+            if url.endswith(f"/firewall/address/{name}"):
+                return _resp(200)
+            if url.endswith("/firewall/addrgrp/AegisCTI-Blocklist"):
+                return _resp(200, {"results": [{"member": [{"name": name}]}]})
+            if url.endswith("/firewall/policy"):
+                return _resp(500)  # policy adımı patlıyor
+            raise AssertionError(f"beklenmeyen GET: {url}")
+
+        get_mock = AsyncMock(side_effect=fake_get)
+        client = _FakeAsyncClient(get=get_mock)
+
+        with _enabled(), patch.object(FortiGateService, "_client", return_value=client):
+            service = FortiGateService()
+            result = await service.block_ip(ip)
+
+        assert result.success is False
+        assert result.partial is True
+
+
+class TestConcurrentBlockIp:
+    async def test_second_call_waits_for_lock_held_by_first(self):
+        with _enabled(), patch.object(FortiGateService, "_client", return_value=_FakeAsyncClient(
+            get=AsyncMock(return_value=_resp(200, {"results": [{"member": []}, {"name": "x"}]}))
+        )):
+            service = FortiGateService()
+            await _block_lock.acquire()
+            try:
+                task = asyncio.create_task(service.block_ip("1.2.3.4"))
+                await asyncio.sleep(0.05)
+                assert not task.done(), "block_ip lock elde etmeden ilerlememeli"
+            finally:
+                _block_lock.release()
+
+            result = await task
+            assert result.success is True

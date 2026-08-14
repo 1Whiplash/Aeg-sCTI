@@ -27,14 +27,24 @@ async def block_ip(
 ) -> BlockIPResponse:
     """Analistin manuel onayıyla bir IP'yi FortiGate'te engellemeyi dener."""
     service = FortiGateService()
-    blocked = await service.block_ip(request.ip_address)
+    result = await service.block_ip(request.ip_address)
 
-    if blocked:
+    if result.success:
         return BlockIPResponse(
             blocked=True,
             message=(
                 f"{request.ip_address} FortiGate'te engellendi — blocklist grubuna eklendi ve "
                 "iki yönlü (gelen/giden) deny policy aktif."
+            ),
+        )
+
+    if result.partial:
+        return BlockIPResponse(
+            blocked=False,
+            message=(
+                f"{request.ip_address} blocklist grubuna eklenmiş OLABİLİR ama engelleme "
+                "politikaları kurulamadı — bu 'engellenmedi' değil, BELİRSİZ bir durumdur. "
+                "FortiGate cihazını manuel kontrol edin (sunucu loglarını da inceleyin)."
             ),
         )
 
