@@ -19,6 +19,9 @@ class TestParseCheckTimes:
     def test_skips_invalid_entries(self):
         assert _parse_check_times("08:00,not-a-time,17:00") == [(8, 0), (17, 0)]
 
+    def test_skips_out_of_range_entries(self):
+        assert _parse_check_times("08:60,24:00,17:00") == [(17, 0)]
+
     def test_empty_string_returns_empty_list(self):
         assert _parse_check_times("") == []
 

@@ -34,7 +34,10 @@ def _parse_check_times(raw: str) -> list[tuple[int, int]]:
             continue
         try:
             hour_str, minute_str = part.split(":")
-            times.append((int(hour_str), int(minute_str)))
+            hour, minute = int(hour_str), int(minute_str)
+            if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                raise ValueError("saat/dakika aralık dışı")
+            times.append((hour, minute))
         except ValueError:
             logger.warning("BOOKMARK_CHECK_TIMES içinde geçersiz saat atlandı: %r", part)
     return times
