@@ -24,6 +24,15 @@ from app.services.email_service import BookmarkChangeReport, is_meaningful_chang
 
 logger = logging.getLogger(__name__)
 
+# BOOKMARK_CHECK_TIMES'taki her saat, APScheduler'da AYRI bir job id'si olarak
+# kaydedilir (bkz. create_scheduler). APScheduler'ın varsayılan max_instances=1
+# koruması sadece AYNI job id'nin kendi kendiyle üst üste binmesini engeller —
+# örn. 08:00 çalışması bitmeden 17:00 tetiklenirse (bookmark sayısı arttıkça
+# gerçek bir risk), bu FARKLI job id'ler olduğu için ikisi paralel çalışabilir.
+# Tüm job'lar aynı fonksiyonu çağırdığı için modül seviyesinde tek bir lock,
+# job id'den bağımsız olarak üst üste binmeyi engeller.
+_job_lock = asyncio.Lock()
+
 
 def _parse_check_times(raw: str) -> list[tuple[int, int]]:
     """"08:00,17:00" -> [(8, 0), (17, 0)]. Geçersiz girdiler atlanır (loglanır)."""
@@ -44,7 +53,23 @@ def _parse_check_times(raw: str) -> list[tuple[int, int]]:
 
 
 async def run_bookmark_check_job() -> None:
-    """Tüm bookmark'ları yeniden kontrol edip anlamlı değişiklikleri e-postayla raporlar."""
+    """Tüm bookmark'ları yeniden kontrol edip anlamlı değişiklikleri e-postayla raporlar.
+
+    Farklı BOOKMARK_CHECK_TIMES saatleri farklı job id'leri olduğu için,
+    bir önceki çalışma hâlâ sürüyorsa (uzun bir izleme listesi yüzünden)
+    bu tetiklemeyi paralel başlatmak yerine atlar.
+    """
+    if _job_lock.locked():
+        logger.warning(
+            "Önceki zamanlanmış izleme listesi kontrolü hâlâ çalışıyor, bu tetikleme atlandı."
+        )
+        return
+
+    async with _job_lock:
+        await _run_bookmark_check_job_locked()
+
+
+async def _run_bookmark_check_job_locked() -> None:
     logger.info("Zamanlanmış izleme listesi kontrolü başlıyor.")
     async with AsyncSessionLocal() as db:
         bookmarks = (await db.execute(select(Bookmark))).scalars().all()

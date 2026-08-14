@@ -4,6 +4,7 @@ zamanlanmış kontrol döngüsü mantığı için birim testleri."""
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.core.enums import IOCType
+from app.services import bookmark_scheduler
 from app.services.bookmark_scheduler import _parse_check_times, create_scheduler, run_bookmark_check_job
 
 
@@ -85,3 +86,12 @@ class TestRunBookmarkCheckJob:
 
         assert mock_recheck.await_count == 2
         mock_db.rollback.assert_awaited_once()
+
+    async def test_skips_run_if_previous_run_still_in_progress(self):
+        """BOOKMARK_CHECK_TIMES'taki her saat farklı bir APScheduler job id'sidir,
+        bu yüzden max_instances=1 aralarında koruma sağlamaz — modül seviyesindeki
+        _job_lock, bir önceki çalışma bitmeden yenisinin başlamasını engellemeli."""
+        async with bookmark_scheduler._job_lock:
+            with patch("app.services.bookmark_scheduler.AsyncSessionLocal") as mock_session_factory:
+                await run_bookmark_check_job()
+                mock_session_factory.assert_not_called()
