@@ -59,6 +59,12 @@ async def run_bookmark_check_job() -> None:
                 analysis, diff = await recheck_bookmark_and_diff(db, bookmark, provider)
             except Exception as exc:  # noqa: BLE001 — bir gösterge başarısız olsa da diğerleri devam etmeli
                 logger.error("Zamanlanmış kontrol başarısız (%s): %s", bookmark.value, exc)
+                # Hata bir DB işlemi sırasında oluştuysa (commit/execute), session'ın
+                # transaction'ı "aborted" durumda kalır ve rollback yapılmadan sonraki
+                # her db.execute() de aynı şekilde patlar — bu da tek bir DB hatasının
+                # kalan tüm bookmark'ları sessizce iptal etmesine yol açar. Rollback,
+                # session'ı bir sonraki bookmark için temiz bir transaction'a döndürür.
+                await db.rollback()
                 continue
             if is_meaningful_change(diff):
                 reports.append(

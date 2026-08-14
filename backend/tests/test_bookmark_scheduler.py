@@ -1,9 +1,10 @@
-"""bookmark_scheduler.py'deki saat ayrıştırma ve scheduler kurulum
-mantığı için birim testleri (gerçek bir zamanlanmış görev çalıştırmaz)."""
+"""bookmark_scheduler.py'deki saat ayrıştırma, scheduler kurulum ve
+zamanlanmış kontrol döngüsü mantığı için birim testleri."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.services.bookmark_scheduler import _parse_check_times, create_scheduler
+from app.core.enums import IOCType
+from app.services.bookmark_scheduler import _parse_check_times, create_scheduler, run_bookmark_check_job
 
 
 class TestParseCheckTimes:
@@ -44,3 +45,43 @@ class TestCreateScheduler:
             "app.services.bookmark_scheduler.settings.BOOKMARK_CHECK_TIMES", ""
         ):
             assert create_scheduler() is None
+
+
+def _mock_bookmark(value: str) -> MagicMock:
+    bookmark = MagicMock()
+    bookmark.value = value
+    bookmark.ioc_type = IOCType.IP
+    bookmark.display_name = f"Test {value}"
+    return bookmark
+
+
+class TestRunBookmarkCheckJob:
+    async def test_db_failure_on_one_bookmark_rolls_back_and_continues_to_next(self):
+        """Bir bookmark'ın recheck'i DB katmanında patlarsa, session rollback
+        edilmeli ve döngü kalan bookmark'lara devam edebilmeli — aksi halde
+        session'ın transaction'ı 'aborted' kalıp sonraki tüm bookmark'ları da
+        sessizce başarısız kılar (bkz. bookmark_scheduler.py'deki rollback notu)."""
+        bookmark_a = _mock_bookmark("1.1.1.1")
+        bookmark_b = _mock_bookmark("2.2.2.2")
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [bookmark_a, bookmark_b]
+        mock_db.execute.return_value = mock_result
+
+        mock_session_cm = AsyncMock()
+        mock_session_cm.__aenter__.return_value = mock_db
+        mock_session_cm.__aexit__.return_value = False
+
+        with patch("app.services.bookmark_scheduler.AsyncSessionLocal", return_value=mock_session_cm), patch(
+            "app.services.bookmark_scheduler.AggregatedCTIProvider"
+        ), patch(
+            "app.services.bookmark_scheduler.recheck_bookmark_and_diff",
+            AsyncMock(side_effect=[Exception("db patladı"), (MagicMock(), MagicMock())]),
+        ) as mock_recheck, patch(
+            "app.services.bookmark_scheduler.is_meaningful_change", return_value=False
+        ), patch("app.services.bookmark_scheduler.send_bookmark_report"):
+            await run_bookmark_check_job()
+
+        assert mock_recheck.await_count == 2
+        mock_db.rollback.assert_awaited_once()
