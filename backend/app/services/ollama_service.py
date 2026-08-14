@@ -61,6 +61,21 @@ _FALLBACK_RESULT = LLMAnalysisResult(
     recommended_actions=[],
 )
 
+
+class LLMUnavailableError(Exception):
+    """Ollama'dan (timeout, bağlantı hatası, şemaya uymayan çıktı vb. nedenle)
+    geçerli bir yanıt alınamadığını belirtir.
+
+    cti_provider.py bunu yakalayıp `fallback` içeriğini kullanıcıya döner ama
+    sonucu ÖNBELLEKLEMEZ — aksi halde geçici bir Ollama arızası (örn. soğuk
+    başlangıç) o IOC için CACHE_TTL_SECONDS boyunca (20 dk) herkese yanlışlıkla
+    "kullanılamıyor" sonucu servis eder.
+    """
+
+    def __init__(self, fallback: LLMAnalysisResult) -> None:
+        super().__init__("Ollama'dan geçerli bir yanıt alınamadı.")
+        self.fallback = fallback
+
 # CJK (Çince/Japonca), Hangul (Korece), Kiril ve Arapça alfabe aralıkları.
 _NON_TURKISH_SCRIPT = re.compile(
     r"[一-鿿぀-ヿ가-힯Ѐ-ӿ؀-ۿ]"
@@ -89,7 +104,7 @@ class OllamaAnalysisService(ILLMEnrichmentService):
             result = retry if retry is not None else result
 
         if result is None:
-            return _FALLBACK_RESULT
+            raise LLMUnavailableError(_FALLBACK_RESULT)
 
         if self._is_contaminated(result):
             logger.error(

@@ -20,7 +20,7 @@ from app.services.cache import AnalysisCache
 from app.services.exposure import extract_exposed_services
 from app.services.geo import extract_geo
 from app.services.interfaces import ICTIProvider
-from app.services.ollama_service import OllamaAnalysisService
+from app.services.ollama_service import LLMUnavailableError, OllamaAnalysisService
 from app.services.risk_engine import RiskEngine
 from app.services.siem_service import export_to_siem
 
@@ -48,7 +48,14 @@ class AggregatedCTIProvider(ICTIProvider):
         logger.info("IOC sorgulanıyor: %s (%s)", request.value, request.ioc_type)
 
         osint_evidence = await self._aggregator.gather(request.value, request.ioc_type)
-        llm_result = await self._llm_service.analyze(request.value, request.ioc_type, osint_evidence)
+        try:
+            llm_result = await self._llm_service.analyze(request.value, request.ioc_type, osint_evidence)
+            llm_available = True
+        except LLMUnavailableError as exc:
+            logger.warning("LLM kullanılamadı (%s), sonuç önbelleklenmeyecek.", request.value)
+            llm_result = exc.fallback
+            llm_available = False
+
         risk_score, severity = await self._risk_engine.score(
             self._db, request.value, osint_evidence, llm_result.risk_score
         )
@@ -66,7 +73,8 @@ class AggregatedCTIProvider(ICTIProvider):
         )
 
         await self._persist(response)
-        await self._cache.set(request.ioc_type.value, request.value, response.model_dump(mode="json"))
+        if llm_available:
+            await self._cache.set(request.ioc_type.value, request.value, response.model_dump(mode="json"))
 
         # Fire-and-forget: SIEM'e gönderim /analyze yanıt süresini asla
         # etkilememeli (export_to_siem içten kendi zaman aşımını ve hata
