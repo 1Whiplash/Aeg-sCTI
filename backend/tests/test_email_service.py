@@ -86,6 +86,22 @@ class TestReportBuilders:
         assert "4 gösterge kontrol edildi" in text
         assert "<table" in html
 
+    def test_html_report_escapes_display_name(self):
+        """display_name admin tarafından serbest metin olarak girilebiliyor
+        (POST /bookmarks); HTML/script içeren bir değer, e-postayı açan
+        analistin mail istemcisinde ham markup olarak render edilmemeli."""
+        diff = BookmarkDiff(is_first_check=False, previous_risk_score=20, risk_score_delta=25)
+        report = BookmarkChangeReport(
+            display_name="<img src=x onerror=alert(1)>",
+            value="1.2.3.4",
+            ioc_type="ip",
+            analysis=_analysis(),
+            diff=diff,
+        )
+        html_out = build_report_html([report], total_checked=3)
+        assert "<img src=x onerror=alert(1)>" not in html_out
+        assert "&lt;img src=x onerror=alert(1)&gt;" in html_out
+
 
 class TestSendBookmarkReport:
     def test_disabled_sends_nothing(self):

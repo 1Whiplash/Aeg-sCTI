@@ -10,6 +10,7 @@ modelin nüanslı bir görevi güvenilir yapmasına güvenilmiyor). Sadece
 her kontролde "değişiklik yok" e-postası atıp gürültü yaratmamak için.
 """
 
+import html
 import logging
 import smtplib
 from dataclasses import dataclass
@@ -111,8 +112,8 @@ def build_report_html(reports: list[BookmarkChangeReport], total_checked: int) -
         rows.append(f"""
         <tr>
           <td style="padding:12px 8px;border-bottom:1px solid #e2e2e2;">
-            <b>{r.display_name}</b><br>
-            <code style="font-size:12px;color:#666;">{r.value} · {r.ioc_type.upper()}</code>
+            <b>{html.escape(r.display_name)}</b><br>
+            <code style="font-size:12px;color:#666;">{html.escape(r.value)} · {html.escape(r.ioc_type.upper())}</code>
           </td>
           <td style="padding:12px 8px;border-bottom:1px solid #e2e2e2;">
             {r.diff.previous_risk_score} → <b>{r.analysis.risk_score}</b>
